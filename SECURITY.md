@@ -14,6 +14,9 @@ AI-yordamchi kompyuteringizni boshqaradi, shuning uchun xavfsizlik birinchi o'ri
 - **Panel**: standart holatda faqat `127.0.0.1`. Har so'rov token talab qiladi (HttpOnly, SameSite=Strict
   cookie yoki `Authorization: Bearer`), boshqa saytdan o'zgartiruvchi so'rovlar rad etiladi.
   Tarmoqqa ochsangiz (`api.host = 0.0.0.0`), uni faqat ishonchli tarmoqda yoki VPN/HTTPS proksi orqali qiling.
+- **Foydalanuvchi vositalari**: faqat paneldan (token bilan) yaratiladi, model o'zi vosita yarata olmaydi.
+  Skript vositasi doim tasdiq so'raydi, parametrlar matnga emas muhit o'zgaruvchisiga beriladi. API vositasi
+  URL hostini model o'zgartira olmaydi, redirect kuzatilmaydi, kalitlar natijada `***` bilan yashiriladi.
 - **O'rgatish rejimi**: parol maydonlariga yozilgan matn saqlanmaydi; takrorlashda o'sha joyda to'xtaydi.
 - **Maxfiylik**: loglar va xotira faqat sizning kompyuteringizda (`logs/`, `data/`). Kutish rejimida
   eshitilgan qisqa gaplar STT serveringizga yuboriladi (o'chirish: `voice.stt_wake = false`).

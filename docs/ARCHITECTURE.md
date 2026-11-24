@@ -13,6 +13,7 @@
 │  plugins/          plugin'lar (alohida modullar): vositalar, voqealar, jadvallar, API       │
 │  learning.py       retseptlar va ilova o'ziga xosliklari (avtomatik o'rganish)              │
 │  teach.py          ko'rsatib o'rgatish: yozib olish va takrorlash                           │
+│  usertools.py      paneldan yaratilgan vositalar: API, skript, parametrli skill             │
 │  settings.py       sozlamalar reyestri (env > config.json > standart; kalitlar — keyring)   │
 │  api/server.py     boshqaruv paneli API'si (FastAPI) + webui/ (statik, build'siz)           │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -39,6 +40,7 @@
 | Nima qo'shmoqchisiz | Qayerga |
 |---|---|
 | Yangi funksiya (qo'ng'iroq, xodimlar nazorati, integratsiya) | `plugins/<id>/plugin.py` — [PLUGINS.md](PLUGINS.md) |
+| Kod yozmasdan vosita (API, skript, skill) | Panel → Mening vositalarim — [USER_TOOLS.md](USER_TOOLS.md) |
 | Yangi yadro vositasi | `yordamchi/tools/*.py` (`@registry.tool`) |
 | Ilova injiqligini kod bilan hal qilish | `yordamchi/tools/popups.py` (`RULES`) |
 | Yangi sozlama | `settings.py` (`_core`) yoki plugin `MANIFEST["settings"]` |
@@ -54,6 +56,7 @@
 | `data/memory.json` | faktlar |
 | `data/procedures.json` | retseptlar, o'ziga xosliklar, o'rgatilgan skill indeksi |
 | `data/skills/*.json` | o'rgatilgan skill qadamlari |
+| `data/tools/*.json` | foydalanuvchi yaratgan vositalar |
 | `data/plugins/<id>/` | plugin ma'lumotlari |
 | `logs/*.jsonl` | navbatlar va ovoz hodisalari |
 

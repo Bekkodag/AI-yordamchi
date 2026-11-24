@@ -356,6 +356,7 @@ def create_app() -> FastAPI:
         for s in teach.load_skills():
             out.append({"slug": Path(s["_path"]).stem, "name": s["name"], "app": s.get("app"),
                         "created": s.get("created"), "uses": s.get("uses", 0),
+                        "params": teach.placeholders(s.get("steps", [])),
                         "steps": [dict(st, text_=teach.describe(st)) for st in s.get("steps", [])]})
         return {"skills": out, "teaching": teach.RECORDER.name if teach.RECORDER.active else None}
 
@@ -379,7 +380,15 @@ def create_app() -> FastAPI:
             data["steps"] = [{k: v for k, v in s.items() if k != "text_"} for s in steps]
         if "name" in body and str(body["name"]).strip():
             data["name"] = " ".join(str(body["name"]).split())[:80]
+        from .. import teach
+        from ..tools.skills import _register_procedure
+
+        if teach.placeholders(data["steps"]):
+            data["params"] = teach.placeholders(data["steps"])
+        else:
+            data.pop("params", None)
         p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        _register_procedure(data["name"], data.get("app", ""))  # yordamchi parametrlarni bilsin
         return {"ok": True}
 
     @app.delete("/api/skills/{slug}", dependencies=[Auth])
@@ -400,7 +409,8 @@ def create_app() -> FastAPI:
         from .. import teach
 
         data = json.loads(_skill_path(slug).read_text(encoding="utf-8"))
-        res = await _in_tools_thread(teach.run_steps, data["steps"], int(body.get("start_step", 0)))
+        params = body.get("params") if isinstance(body.get("params"), dict) else None
+        res = await _in_tools_thread(teach.run_steps, data["steps"], int(body.get("start_step", 0)), 20.0, params)
         return res
 
     @app.post("/api/teach/start", dependencies=[Auth])
@@ -414,6 +424,77 @@ def create_app() -> FastAPI:
         from ..tools import load_all
 
         return load_all().get("stop_teaching").invoke({"save": bool(body.get("save", True))})
+
+    # ---------------------------------------------------------------- user-created tools
+    def _ut_call(fn, *args):
+        from ..tools.base import ToolError
+
+        try:
+            return fn(*args)
+        except ToolError as e:
+            raise HTTPException(400, str(e)) from None
+
+    @app.get("/api/usertools", dependencies=[Auth])
+    def usertools_list():
+        from .. import usertools
+        from ..tools import load_all
+
+        load_all()
+        return usertools.describe()
+
+    @app.post("/api/usertools", dependencies=[Auth])
+    def usertools_create(body: dict = Body(...)):
+        from .. import usertools
+
+        spec = _ut_call(usertools.save_spec, body)
+        return {"ok": True, "tool": spec, "error": usertools.STATE["errors"].get(spec["name"])}
+
+    @app.put("/api/usertools/{name}", dependencies=[Auth])
+    def usertools_update(name: str, body: dict = Body(...)):
+        from .. import usertools
+
+        if _ut_call(usertools.get_spec, name) is None:
+            raise HTTPException(404, "vosita topilmadi")
+        spec = _ut_call(usertools.save_spec, body, name)
+        return {"ok": True, "tool": spec, "error": usertools.STATE["errors"].get(spec["name"])}
+
+    @app.delete("/api/usertools/{name}", dependencies=[Auth])
+    def usertools_delete(name: str):
+        from .. import usertools
+
+        if not _ut_call(usertools.delete_spec, name):
+            raise HTTPException(404, "vosita topilmadi")
+        return {"ok": True}
+
+    @app.post("/api/usertools/test", dependencies=[Auth])
+    async def usertools_test(body: dict = Body(...)):
+        """Saqlamasdan sinash. Skript faqat foydalanuvchi panelda tasdiqlasa (confirm: true) bajariladi."""
+        from .. import usertools
+
+        spec = _ut_call(usertools.validate, body.get("spec") or {})
+        if spec["kind"] == "script" and body.get("confirm") is not True:
+            raise HTTPException(400, "skriptni sinash uchun tasdiq kerak")
+        args = body.get("args") if isinstance(body.get("args"), dict) else {}
+        if STATE["runtime"] is not None:
+            return await _in_tools_thread(usertools.execute, spec, args)
+        if spec["kind"] == "skill":
+            raise HTTPException(503, "skill'ni sinash uchun yordamchi ishlab turishi kerak")
+        return await asyncio.to_thread(usertools.execute, spec, args)
+
+    @app.put("/api/usertools/secrets/{secret}", dependencies=[Auth])
+    def usertools_secret(secret: str, body: dict = Body(...)):
+        from .. import usertools
+
+        if not usertools.SECRET_RE.match(secret):
+            raise HTTPException(400, "kalit nomi KATTA_HARF bilan")
+        key = usertools.secret_key(secret)
+        if key not in STORE.specs:
+            raise HTTPException(404, "bu kalitni hech bir vosita ishlatmaydi")
+        try:
+            STORE.set(key, str(body.get("value") or "") or None)
+        except PermissionError as e:
+            raise HTTPException(409, str(e)) from None
+        return {"ok": True, "is_set": bool(STORE.get(key))}
 
     # ---------------------------------------------------------------- plugins
     @app.get("/api/plugins", dependencies=[Auth])

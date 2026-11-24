@@ -209,10 +209,12 @@ function skillItem(s) {
     h('div', { class: 'main' },
       h('strong', {}, s.name), ' ', h('span', { class: 'pill' }, s.app || '?'), ' ',
       h('span', { class: 'muted' }, `${s.steps.length} qadam · ishlatilgan: ${s.uses}`),
+      s.params && s.params.length ? h('div', { class: 'help' }, 'Parametrlar: ' + s.params.map((n) => `{${n}}`).join(', ')) : null,
       h('ol', { class: 'steps' }, s.steps.map((st) => h('li', {}, st.text_)))),
     h('div', { class: 'row' },
       h('button', { class: 'btn small', onclick: () => runSkill(s) }, 'Ishga tushirish'),
       h('button', { class: 'btn small', onclick: () => editSkill(s) }, 'Tahrirlash'),
+      h('button', { class: 'btn small', onclick: () => skillToTool(s) }, 'Vositaga aylantirish'),
       h('button', { class: 'btn small danger', onclick: async () => {
         if (!confirm(`"${s.name}" o'chirilsinmi?`)) return;
         try { await api('/skills/' + s.slug, { method: 'DELETE' }); render(); } catch (e) { fail(e); }
@@ -220,9 +222,15 @@ function skillItem(s) {
 }
 
 async function runSkill(s) {
+  const params = {};
+  for (const n of s.params || []) {
+    const v = prompt(`{${n}} qiymati`);
+    if (v === null) return;
+    params[n] = v;
+  }
   toast('Bajarilmoqda…', 60000);
   try {
-    const r = await api(`/skills/${s.slug}/run`, { method: 'POST', body: {} });
+    const r = await api(`/skills/${s.slug}/run`, { method: 'POST', body: { params } });
     toast(r.ok ? 'Bajarildi' : (r.paused_for_secret ? 'Parolni o\'zingiz kiriting' : `Xato (${(r.failed_step ?? 0) + 1}-qadam): ${r.error}`), 7000);
   } catch (e) { fail(e); }
 }
@@ -239,11 +247,26 @@ function editSkill(s) {
       i > 0 ? h('button', { class: 'btn small', onclick: () => { [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]]; draw(); } }, '↑') : null,
       h('button', { class: 'btn small danger', onclick: () => { steps.splice(i, 1); draw(); } }, '✕')))));
   draw();
-  modal('Skillni tahrirlash', h('div', {}, h('label', {}, 'Nomi'), name, h('label', {}, 'Qadamlar'), list), (close) => [
+  modal('Skillni tahrirlash', h('div', {}, h('label', {}, 'Nomi'), name, h('label', {}, 'Qadamlar'), list,
+    h('div', { class: 'help' }, "Yozilgan matnni {kontakt} kabi o'zgartirsangiz, skill parametrli bo'ladi: " +
+      "yordamchi har safar o'rniga kerakli qiymatni yozadi (masalan, \"Telegramda Aliga yoz\").")), (close) => [
     h('button', { class: 'btn primary', onclick: async () => {
       try { await api('/skills/' + s.slug, { method: 'PUT', body: { name: name.value, steps } }); close(); render(); }
       catch (e) { fail(e); }
     } }, 'Saqlash')]);
+}
+
+async function skillToTool(s) {
+  const base = s.name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const name = /^[a-z]/.test(base) ? base.slice(0, 40) : ('skill_' + base).slice(0, 40);
+  try {
+    const data = await api('/usertools');
+    await editTool(null, data, {
+      kind: 'skill', skill: s.name, name: name.length >= 3 ? name : 'skill_' + name,
+      description: `Runs the taught skill "${s.name}"` + (s.params.length ? ` (values for: ${s.params.join(', ')})` : ''),
+      params: (s.params || []).map((n) => ({ name: n, type: 'string', description: '', required: true })),
+    });
+  } catch (e) { fail(e); }
 }
 
 // ---------------------------------------------------------------- recipes & quirks
@@ -354,6 +377,221 @@ pages.tools = async () => {
 async function patchTool(t, body, el) {
   try { const r = await api('/tools/' + encodeURIComponent(t.name), { method: 'PATCH', body }); Object.assign(t, r.tool); }
   catch (e) { fail(e); if (el) el.checked = !el.checked; }
+}
+
+// ---------------------------------------------------------------- user-created tools
+const KIND_LABEL = { http: 'API (HTTP)', script: 'Skript', skill: "O'rgatilgan skill" };
+const KIND_HELP = {
+  http: "Istalgan xizmat API'sini chaqiradi. URL, sarlavha va tanada {parametr} va {secret:KALIT} ishlatiladi. " +
+    'Kalitlar tizim saqlagichida turadi, natijada doim yashiriladi.',
+  script: "PowerShell, sh yoki Python skripti. Parametrlar muhit o'zgaruvchisi bo'lib keladi: $env:P_SHAHAR " +
+    "(PowerShell), $P_SHAHAR (sh), os.environ['P_SHAHAR'] (Python). Har safar tasdiq so'raladi.",
+  skill: "Ko'rsatib o'rgatilgan skill'ni parametr bilan chaqiradi. Skill matnida {kontakt} kabi joylar bo'lsa, " +
+    'yordamchi ularga har safar kerakli qiymatni qo\'yadi.',
+};
+
+pages.mytools = async () => {
+  const data = await api('/usertools');
+  const list = h('div', { class: 'card' }, data.tools.length ? data.tools.map((t) => h('div', { class: 'list-item' },
+    h('div', { class: 'main' },
+      h('strong', { class: 'mono' }, t.name), ' ', h('span', { class: 'pill' }, KIND_LABEL[t.kind] || t.kind), ' ',
+      h('span', { class: 'pill ' + (t.risk === 'confirm' ? 'warn' : '') }, t.risk === 'confirm' ? 'tasdiq' : 'xavfsiz'), ' ',
+      t.error ? h('span', { class: 'pill warn' }, 'xato') : null,
+      h('div', { class: 'help' }, t.description),
+      t.params && t.params.length ? h('div', { class: 'help' }, 'Parametrlar: ' + t.params.map((p) => p.name).join(', ')) : null,
+      t.error ? h('div', { class: 'help', style: 'color:var(--warn)' }, t.error) : null),
+    h('div', { class: 'row' },
+      toggle(t.enabled !== false, async (on, el) => {
+        try { await api('/usertools/' + t.name, { method: 'PUT', body: { ...t, enabled: on } }); render(); }
+        catch (e) { fail(e); el.checked = !on; }
+      }),
+      h('button', { class: 'btn small', onclick: () => testTool(t) }, 'Sinash'),
+      h('button', { class: 'btn small', onclick: () => editTool(t, data) }, 'Tahrirlash'),
+      h('button', { class: 'btn small danger', onclick: async () => {
+        if (!confirm(`"${t.name}" o'chirilsinmi?`)) return;
+        try { await api('/usertools/' + t.name, { method: 'DELETE' }); render(); } catch (e) { fail(e); }
+      } }, "O'chirish"))))
+    : h('div', { class: 'empty' }, "Hali o'zingiz yaratgan vosita yo'q."));
+  const secrets = data.secrets.length ? h('div', { class: 'card' }, h('h2', { style: 'margin-top:0' }, 'Vosita kalitlari'),
+    data.secrets.map((s) => h('div', { class: 'list-item' },
+      h('div', { class: 'main' }, h('span', { class: 'mono' }, s.name), ' ',
+        h('span', { class: 'pill ' + (s.is_set ? 'ok' : 'warn') }, s.is_set ? "o'rnatilgan" : "o'rnatilmagan")),
+      h('button', { class: 'btn small', onclick: () => setSecret(s) }, s.is_set ? 'Almashtirish' : 'Kiritish')))) : null;
+  show(
+    h('div', { class: 'row' }, h('h1', {}, 'Mening vositalarim'), h('span', { class: 'spacer' }),
+      h('button', { class: 'btn', onclick: importTool }, 'JSON import'),
+      h('button', { class: 'btn primary', onclick: () => editTool(null, data) }, '+ Yangi vosita')),
+    h('p', { class: 'muted' }, "Kod yozmasdan yangi vosita qo'shing: API chaqiruvi, skript yoki o'rgatilgan skill. " +
+      'Saqlangan zahoti yordamchi uni ishlata boshlaydi, qayta ishga tushirish shart emas.'),
+    list, secrets);
+};
+
+function setSecret(s) {
+  const inp = h('input', { type: 'password', autocomplete: 'off', placeholder: 'qiymat' });
+  modal(`Kalit: ${s.name}`, h('div', {}, inp, h('div', { class: 'help' },
+    "Tizim saqlagichiga yoziladi va panelda boshqa ko'rinmaydi. Bo'sh qoldirsangiz o'chiriladi.")),
+  (close) => [h('button', { class: 'btn primary', onclick: async () => {
+    try { await api('/usertools/secrets/' + s.name, { method: 'PUT', body: { value: inp.value } }); close(); render(); }
+    catch (e) { fail(e); }
+  } }, 'Saqlash')]);
+}
+
+function importTool() {
+  const ta = h('textarea', { rows: 12, placeholder: '{"name": "...", "kind": "http", ...}' });
+  modal('JSON import', h('div', {}, ta, h('div', { class: 'help' },
+    "Boshqa foydalanuvchi ulashgan vosita. Kalitlar JSON ichida bo'lmaydi: ularni keyin o'zingiz kiritasiz.")),
+  (close) => [h('button', { class: 'btn primary', onclick: async () => {
+    let spec;
+    try { spec = JSON.parse(ta.value); } catch (e) { toast('JSON xato: ' + e.message, 5000); return; }
+    try { await api('/usertools', { method: 'POST', body: spec }); close(); render(); toast("Qo'shildi"); } catch (e) { fail(e); }
+  } }, "Qo'shish")]);
+}
+
+function paramEditor(initial) {
+  const rows = initial.map((p) => ({ ...p }));
+  const box = h('div', {});
+  const draw = () => box.replaceChildren(
+    ...rows.map((p, i) => {
+      const name = h('input', { value: p.name || '', placeholder: 'nom (shahar)' });
+      name.addEventListener('input', () => { p.name = name.value.trim(); });
+      const type = h('select', {}, ['string', 'integer', 'number', 'boolean'].map((t) => h('option',
+        { value: t, selected: t === (p.type || 'string') || null },
+        { string: 'matn', integer: 'butun son', number: 'son', boolean: "ha/yo'q" }[t])));
+      type.addEventListener('change', () => { p.type = type.value; });
+      const desc = h('input', { value: p.description || '', placeholder: "nima ekanligi (modelga ko'rsatiladi)" });
+      desc.addEventListener('input', () => { p.description = desc.value; });
+      return h('div', { class: 'row', style: 'margin-bottom:6px;flex-wrap:wrap' },
+        h('div', { style: 'flex:1 1 90px' }, name), h('div', { style: 'flex:0 0 110px' }, type),
+        h('div', { style: 'flex:2 1 140px' }, desc), h('span', { class: 'help' }, 'majburiy'),
+        toggle(p.required !== false, (on) => { p.required = on; }),
+        h('button', { class: 'btn small danger', onclick: () => { rows.splice(i, 1); draw(); } }, '✕'));
+    }),
+    h('button', { class: 'btn small', onclick: () => { rows.push({ name: '', type: 'string', description: '', required: true }); draw(); } },
+      '+ Parametr'));
+  draw();
+  return { el: box, get: () => rows.filter((p) => p.name), set: (list) => { rows.splice(0, rows.length, ...list); draw(); } };
+}
+
+function headersToText(hd) { return Object.entries(hd || {}).map(([k, v]) => `${k}: ${v}`).join('\n'); }
+function textToHeaders(t) {
+  const out = {};
+  for (const line of linesToList(t)) { const i = line.indexOf(':'); if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
+  return out;
+}
+
+async function editTool(orig, data, preset = null) {
+  const isNew = !orig;
+  const t = orig ? { ...orig } : { kind: 'http', method: 'GET', body_type: 'json', shell: data.shells[0], params: [], timeout: 30, enabled: true, ...(preset || {}) };
+  const skills = (await api('/skills').catch(() => ({ skills: [] }))).skills;
+  const name = h('input', { value: t.name || '', placeholder: 'masalan: ob_havo' });
+  const desc = h('textarea', { rows: 2, placeholder: 'Qachon ishlatiladi: masalan "Shahardagi hozirgi ob-havoni aytadi"' });
+  desc.value = t.description || '';
+  const kind = h('select', {}, data.kinds.map((k) => h('option', { value: k, selected: k === t.kind || null }, KIND_LABEL[k])));
+  const kindHelp = h('div', { class: 'help' });
+  const params = paramEditor(t.params || []);
+  const risk = h('select', {}, h('option', { value: 'safe' }, "xavfsiz: o'zi bajaradi"), h('option', { value: 'confirm' }, "tasdiq so'rasin"));
+  const timeout = h('input', { type: 'number', value: t.timeout || 30, min: 3, max: 300 });
+  // http
+  const method = h('select', {}, data.methods.map((m) => h('option', { value: m, selected: m === t.method || null }, m)));
+  const url = h('input', { value: t.url || '', placeholder: 'https://api.example.com/weather?city={shahar}' });
+  const headers = h('textarea', { rows: 2, placeholder: 'Authorization: Bearer {secret:OBHAVO_KALIT}' });
+  headers.value = headersToText(t.headers);
+  const bodyType = h('select', {}, data.body_types.map((b) => h('option', { value: b, selected: b === t.body_type || null }, b)));
+  const body = h('textarea', { rows: 4, placeholder: '{"text": "{matn}"}' }); body.value = t.body || '';
+  const resultPath = h('input', { value: t.result_path || '', placeholder: "masalan: current.temp (bo'sh: butun javob)" });
+  // script
+  const shell = h('select', {}, data.shells.map((s) => h('option', { value: s, selected: s === t.shell || null }, s)));
+  const script = h('textarea', { rows: 8, class: 'mono', placeholder: 'Get-Date -Format "HH:mm"' }); script.value = t.script || '';
+  const secretsInp = h('input', { value: (t.secrets || []).join(', '), placeholder: 'KALIT_NOMI (skriptda $env:SECRET_KALIT_NOMI)' });
+  // skill
+  const skill = h('select', {}, h('option', { value: '' }, '— tanlang —'), skills.map((s) => h('option',
+    { value: s.name, selected: s.name === t.skill || null }, s.name + (s.params.length ? ` (${s.params.join(', ')})` : ''))));
+  skill.addEventListener('change', () => {
+    const s = skills.find((x) => x.name === skill.value);
+    if (s && !params.get().length && s.params.length) params.set(s.params.map((n) => ({ name: n, type: 'string', description: '', required: true })));
+  });
+  const sections = {
+    http: h('div', {},
+      h('div', { class: 'row' }, h('div', { style: 'flex:0 0 110px' }, h('label', {}, 'Metod'), method),
+        h('div', { class: 'spacer' }, h('label', {}, 'URL'), url)),
+      h('label', {}, 'Sarlavhalar (har qatorda Nom: qiymat)'), headers,
+      h('div', { class: 'row' }, h('div', { style: 'flex:0 0 110px' }, h('label', {}, 'Tana turi'), bodyType),
+        h('div', { class: 'spacer' }, h('label', {}, 'Javobdan olinadigan qism'), resultPath)),
+      h('label', {}, 'Tana (GET uchun ishlatilmaydi)'), body),
+    script: h('div', {}, h('label', {}, 'Til'), shell, h('label', {}, 'Skript'), script,
+      h('label', {}, 'Ishlatadigan kalitlar (vergul bilan)'), secretsInp),
+    skill: h('div', {}, h('label', {}, "O'rgatilgan skill"), skill,
+      h('div', { class: 'help' }, "Skill matnidagi {nom} joylari uchun shu nomdagi parametr qo'shing.")),
+  };
+  const kindBox = h('div', {});
+  const syncKind = () => {
+    kindBox.replaceChildren(sections[kind.value]);
+    kindHelp.textContent = KIND_HELP[kind.value];
+    risk.disabled = kind.value === 'script';
+    risk.value = kind.value === 'script' ? 'confirm'
+      : (t.risk && t.kind === kind.value ? t.risk : (kind.value === 'http' && method.value !== 'GET' ? 'confirm' : 'safe'));
+  };
+  kind.addEventListener('change', syncKind);
+  method.addEventListener('change', () => { if (isNew) syncKind(); });
+  syncKind();
+  const collect = () => {
+    const spec = { name: name.value.trim(), kind: kind.value, description: desc.value, params: params.get(), risk: risk.value,
+      timeout: Number(timeout.value) || 30, enabled: t.enabled !== false };
+    if (kind.value === 'http') Object.assign(spec, { method: method.value, url: url.value.trim(), headers: textToHeaders(headers.value),
+      body_type: bodyType.value, body: body.value, result_path: resultPath.value.trim() });
+    if (kind.value === 'script') Object.assign(spec, { shell: shell.value, script: script.value, secrets: wordsToList(secretsInp.value) });
+    if (kind.value === 'skill') spec.skill = skill.value;
+    return spec;
+  };
+  modal(isNew ? 'Yangi vosita' : `Tahrirlash: ${t.name}`, h('div', {},
+    h('div', { class: 'row' }, h('div', { class: 'spacer' }, h('label', {}, 'Nomi'), name),
+      h('div', { style: 'flex:0 0 190px' }, h('label', {}, 'Turi'), kind)),
+    kindHelp,
+    h('label', {}, 'Tavsif (yordamchi shu orqali qachon ishlatishni biladi)'), desc,
+    h('label', {}, 'Parametrlar'), params.el,
+    kindBox,
+    h('div', { class: 'row' }, h('div', { class: 'spacer' }, h('label', {}, 'Xavf'), risk),
+      h('div', { style: 'flex:0 0 120px' }, h('label', {}, 'Vaqt (s)'), timeout))), (close) => [
+    h('button', { class: 'btn', onclick: () => testTool(collect()) }, 'Sinash'),
+    h('button', { class: 'btn', onclick: () => {
+      const blob = new Blob([JSON.stringify(collect(), null, 1)], { type: 'application/json' });
+      h('a', { href: URL.createObjectURL(blob), download: (name.value || 'vosita') + '.json' }).click();
+    } }, 'JSON'),
+    h('button', { class: 'btn primary', onclick: async () => {
+      try {
+        const r = isNew ? await api('/usertools', { method: 'POST', body: collect() })
+          : await api('/usertools/' + t.name, { method: 'PUT', body: collect() });
+        close(); render();
+        toast(r.error ? 'Saqlandi, lekin: ' + r.error : 'Saqlandi: yordamchi endi ishlata oladi', 5000);
+      } catch (e) { fail(e); }
+    } }, 'Saqlash')]);
+}
+
+function testTool(spec) {
+  const inputs = {};
+  const fields = (spec.params || []).map((p) => {
+    const inp = p.type === 'boolean'
+      ? h('select', {}, h('option', { value: 'true' }, 'ha'), h('option', { value: 'false' }, "yo'q"))
+      : h('input', { type: p.type === 'string' ? 'text' : 'number', value: p.default ?? '', placeholder: p.description || '' });
+    inputs[p.name] = () => {
+      if (inp.value === '') return undefined;
+      if (p.type === 'boolean') return inp.value === 'true';
+      return p.type === 'string' ? inp.value : Number(inp.value);
+    };
+    return h('div', {}, h('label', {}, p.name + (p.required !== false ? ' *' : '')), inp);
+  });
+  const out = h('pre', { class: 'mono', style: 'white-space:pre-wrap;max-height:300px;overflow:auto' });
+  modal(`Sinash: ${spec.name || 'vosita'}`, h('div', {}, fields.length ? fields : h('p', { class: 'muted' }, "Parametr yo'q."), out), () => [
+    h('button', { class: 'btn primary', onclick: async () => {
+      if (spec.kind === 'script' && !confirm('Skript shu kompyuterda bajariladi. Davom etilsinmi?')) return;
+      const args = {};
+      for (const [k, get] of Object.entries(inputs)) { const v = get(); if (v !== undefined) args[k] = v; }
+      out.textContent = 'Bajarilmoqda…';
+      try {
+        const r = await api('/usertools/test', { method: 'POST', body: { spec, args, confirm: spec.kind === 'script' } });
+        out.textContent = JSON.stringify(r, null, 2);
+      } catch (e) { out.textContent = 'Xato: ' + e.message; }
+    } }, 'Bajarish')]);
 }
 
 // ---------------------------------------------------------------- plugins
@@ -486,13 +724,14 @@ pages.logs = async () => {
 
 // ------------------------------------------------------------------ router
 const routes = { '': 'home', chat: 'chat', skills: 'skills', recipes: 'recipes', quirks: 'quirks', facts: 'facts',
-  tools: 'tools', plugins: 'plugins', settings: 'settings', logs: 'logs' };
+  tools: 'tools', mytools: 'mytools', plugins: 'plugins', settings: 'settings', logs: 'logs' };
 
 async function render() {
   const key = location.hash.replace(/^#\/?/, '').split('?')[0];
   const page = routes[key] || 'home';
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
   $('#nav').classList.remove('open');
+  document.querySelectorAll('.modal-bg').forEach((m) => m.remove()); // boshqa sahifaga o'tganda ochiq oyna qolmasin
   if (page !== 'logs' && logSocket) { logSocket.close(); logSocket = null; }
   try { await pages[page](); } catch (e) { show(h('div', { class: 'card error' }, 'Yuklab bo\'lmadi: ' + e.message)); }
   view.focus({ preventScroll: true });

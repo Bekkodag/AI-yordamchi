@@ -19,8 +19,14 @@ def _register_procedure(name: str, app: str) -> None:
     for p in P.load():
         if p.kind == "taught" and p.task == name:
             P.remove(p.id)
+    sk = teach.find_skill(name)
+    need = teach.placeholders(sk["steps"]) if sk else []
+    call = f"run_skill(name='{name}')"
+    if need:  # masalan: run_skill(name='telegramda yuborish', params='{"kontakt": "..."}')
+        example = json.dumps({n: "..." for n in need}, ensure_ascii=False)
+        call = f"run_skill(name='{name}', params='{example}')"
     P.add(Procedure(task=name, app=app or "?", kind="taught", keywords=words[:14],
-                    steps=[f"run_skill(name='{name}') - taught by the user, replays the exact steps"]))
+                    steps=[f"{call} - taught by the user, replays the exact steps"]))
 
 
 @registry.tool()
@@ -58,13 +64,23 @@ def stop_teaching(save: Annotated[bool, "False = discard the recording"] = True)
 
 @registry.tool(timeout=300)
 def run_skill(name: Annotated[str, "Name of a taught skill"],
-              start_step: Annotated[int, "Continue from this step (after a paused_for_secret)"] = 0) -> dict:
+              start_step: Annotated[int, "Continue from this step (after a paused_for_secret)"] = 0,
+              params: Annotated[str, "JSON object with values for the skill's {placeholders}, "
+                                     "e.g. {\"kontakt\": \"Ali\"}"] = "") -> dict:
     """Run a skill the user taught (exact recorded steps: open program, clicks, typing). Prefer it over
-    improvising when a taught skill matches the request."""
+    improvising when a taught skill matches the request. Skills with placeholders need `params`."""
     sk = teach.find_skill(name)
     if not sk:
         raise ToolError(f"No taught skill matches '{name}'. Known: {[s['name'] for s in teach.load_skills()][:10]}")
-    res = teach.run_steps(sk["steps"], start=max(0, start_step))
+    values: dict = params if isinstance(params, dict) else {}  # model ba'zan obyektni to'g'ridan-to'g'ri beradi
+    if isinstance(params, str) and params.strip():
+        try:
+            values = json.loads(params)
+        except json.JSONDecodeError as e:
+            raise ToolError(f"params must be a JSON object: {e.msg}") from e
+        if not isinstance(values, dict):
+            raise ToolError("params must be a JSON object")
+    res = teach.run_steps(sk["steps"], start=max(0, start_step), params=values)
     if res.get("ok"):
         sk["uses"] = sk.get("uses", 0) + 1
         path = Path(sk.pop("_path"))
@@ -80,7 +96,7 @@ def run_skill(name: Annotated[str, "Name of a taught skill"],
 def list_taught_skills() -> dict:
     """List skills the user has taught (name, app, number of steps, how often used)."""
     return {"skills": [{"name": s["name"], "app": s.get("app"), "steps": len(s.get("steps", [])),
-                        "uses": s.get("uses", 0)} for s in teach.load_skills()],
+                        "uses": s.get("uses", 0), "params": teach.placeholders(s.get("steps", []))} for s in teach.load_skills()],
             "teaching_now": teach.RECORDER.name if teach.RECORDER.active else None}
 
 

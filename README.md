@@ -22,6 +22,8 @@ Telegram'da kontaktni topadi va tasdiqlaganingizdan keyin yuboradi.
   keyin yordamchi uni aynan takrorlaydi. Parollar yozib olinmaydi.
 - **Boshqaruv paneli (Web UI)** — sozlamalar va maxfiy kalitlar, vositalar, retseptlar, skill'lar, faktlar,
   plugin'lar, jonli loglar va yozma suhbat. Telefondan ham ochiladi.
+- **O'z vositangiz** — paneldan kod yozmasdan: API chaqiruvi (kalitlar bilan), skript yoki parametrli
+  o'rgatilgan skill ("Telegramda {kontakt}ga {xabar} yoz"). [Batafsil](docs/USER_TOOLS.md)
 - **Plugin'lar** — yangi funksiya asosiy kodga tegmasdan alohida modul bo'lib qo'shiladi.
 - **Istalgan LLM** — OpenAI-mos har qanday provayder: o'z serveringiz, OpenAI, Gemini, Ollama, vLLM...
 - **Xavfsizlik** — xabar yuborish, fayl o'chirish, buyruq bajarish kabi amallar oldidan tasdiq so'raydi;
@@ -62,6 +64,7 @@ Sozlamalarni `.env` fayli bilan ham berish mumkin — namuna: [.env.example](.en
 ## Hujjatlar
 
 - [Arxitektura](docs/ARCHITECTURE.md) — qismlar qanday bog'langan
+- [O'z vositangizni yaratish](docs/USER_TOOLS.md) — API, skript, parametrli skill
 - [Plugin yozish](docs/PLUGINS.md) — yangi funksiya qo'shish
 - [Xavfsizlik](SECURITY.md)
 - [Hissa qo'shish](CONTRIBUTING.md)
@@ -77,5 +80,5 @@ Sozlamalarni `.env` fayli bilan ham berish mumkin — namuna: [.env.example](.en
 **AI-yordamchi** ("AI assistant" in Uzbek) is an open-source voice assistant that controls a Windows PC,
 speaks Uzbek, and learns from use. It works with any OpenAI-compatible LLM, has a web control panel
 (settings and secrets, tools, learned recipes, taught skills, facts, plugins, live logs), lets users teach
-new skills by demonstration, and is extensible through isolated plugins. Windows is fully supported;
+new skills by demonstration, create their own tools (HTTP APIs, scripts, parametrised skills) without code, and is extensible through isolated plugins. Windows is fully supported;
 macOS/Linux control layers and mobile remote clients are planned. Licensed under Apache-2.0.

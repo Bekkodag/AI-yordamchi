@@ -376,6 +376,8 @@ def save_skill(name: str, steps: list[dict]) -> Path:
     apps = [s.get("app") or s.get("process") for s in steps if s["type"] in ("launch", "click")]
     data = {"name": name, "created": datetime.now().isoformat(timespec="seconds"),
             "app": next((a for a in apps if a), ""), "steps": steps, "uses": 0}
+    if placeholders(steps):
+        data["params"] = placeholders(steps)
     path = SKILLS_DIR / f"{slug(name)}.json"
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
@@ -464,8 +466,43 @@ def _invoke(c, double: bool, button: str) -> str:
     return "mouse"
 
 
-def run_steps(steps: list[dict], start: int = 0, step_timeout: float = 20.0) -> dict:
+PARAM = re.compile(r"\{([a-z][a-z0-9_]{0,31})\}")  # vosita parametri nomlari bilan bir xil qoida
+
+
+def placeholders(steps: list[dict]) -> list[str]:
+    """Skill matnidagi {kontakt} kabi o'rinlar: har safar boshqa qiymat bilan ishlatish uchun."""
+    out: list[str] = []
+    for s in steps:
+        if s.get("type") == "text" and not s.get("secret"):
+            for m in PARAM.finditer(s.get("text", "")):
+                if m.group(1) not in out:
+                    out.append(m.group(1))
+    return out
+
+
+def fill(steps: list[dict], params: dict | None) -> list[dict]:
+    """O'rinbosarlarni qiymat bilan to'ldiradi; yetishmasa — xato (bo'sh matn yozib yubormaslik uchun)."""
+    need = placeholders(steps)
+    if not need:
+        return steps
+    params = {k: v for k, v in (params or {}).items() if v is not None and str(v) != ""}
+    missing = [n for n in need if n not in params]
+    if missing:
+        raise ValueError("missing values for: " + ", ".join(missing))
+    out = []
+    for s in steps:
+        if s.get("type") == "text" and not s.get("secret"):
+            s = dict(s, text=PARAM.sub(lambda m: str(params.get(m.group(1), m.group(0))), s["text"]))
+        out.append(s)
+    return out
+
+
+def run_steps(steps: list[dict], start: int = 0, step_timeout: float = 20.0, params: dict | None = None) -> dict:
     """Qadamlarni bajaradi. Element topilmasa nisbiy koordinata bilan bosadi; maxfiy matnda to'xtaydi."""
+    try:
+        steps = fill(steps, params)
+    except ValueError as e:
+        return {"ok": False, "error": str(e), "params": placeholders(steps)}
     import subprocess
 
     import win32gui
