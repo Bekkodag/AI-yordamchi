@@ -70,9 +70,16 @@ def run_voice(settings: Settings, cfg: VoiceConfig, on_event, status, api: bool 
     if api:
         from ..api.server import start_server
 
-        url = start_server(runtime=rt, assistant=va)
-        status(f"Boshqaruv paneli: {url}")
-        if open_panel:
+        try:
+            url = start_server(runtime=rt, assistant=va)
+            from ..api.server import STATE as API_STATE
+
+            note = API_STATE.get("port_note")
+            status(f"Boshqaruv paneli: {url}" + (f"  ({note})" if note else ""))
+        except RuntimeError as e:
+            url = None
+            status(f"[!] Boshqaruv paneli ishga tushmadi: {e}")
+        if open_panel and url:
             import webbrowser
 
             webbrowser.open(url)

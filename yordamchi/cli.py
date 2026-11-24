@@ -127,8 +127,15 @@ def _panel_only(open_browser: bool) -> None:
     """LLM sozlanmagan bo'lsa ham panel ishlaydi: sozlamalarni kiritib, keyin qayta ishga tushirish."""
     from .api.server import start_server
 
-    url = start_server(runtime=None)
-    console.print(f"[bold]Boshqaruv paneli:[/bold] {url}  (to'xtatish: Ctrl+C)")
+    try:
+        url = start_server(runtime=None)
+    except RuntimeError as e:
+        console.print(f"[red]Boshqaruv paneli ishga tushmadi: {e}[/red]")
+        return
+    from .api.server import STATE as API_STATE
+
+    note = API_STATE.get("port_note")
+    console.print(f"[bold]Boshqaruv paneli:[/bold] {url}  (to'xtatish: Ctrl+C)" + (f"  ({note})" if note else ""))
     if open_browser:
         webbrowser.open(url)
     try:
@@ -226,9 +233,16 @@ def main() -> None:
     if not args.once and not args.no_api and g("api.enabled"):
         from .api.server import start_server
 
-        url = start_server(runtime=rt)
-        console.print(f"[dim]Boshqaruv paneli: {url}[/dim]")
-        if args.open:
+        try:
+            url = start_server(runtime=rt)
+            from .api.server import STATE as API_STATE
+
+            note = API_STATE.get("port_note")
+            console.print(f"[dim]Boshqaruv paneli: {url}[/dim]" + (f"  [yellow]({note})[/yellow]" if note else ""))
+        except RuntimeError as e:
+            url = None
+            console.print(f"[yellow]Boshqaruv paneli ishga tushmadi: {e}[/yellow]")
+        if args.open and url:
             webbrowser.open(url)
 
     if args.once:

@@ -231,7 +231,13 @@ class VoiceAssistant:
         self.endpointer = Endpointer(EndpointConfig())
         # Kutish rejimida "Jarvis, ..." ni STT orqali tanish uchun alohida endpointer
         self.idle_ep = Endpointer(EndpointConfig(silence_ms=600, max_ms=8000, start_timeout_ms=10**9))
-        self.wake = WakeWord(threshold=cfg.wake_threshold) if cfg.wake else None
+        self.wake = None
+        if cfg.wake:
+            try:
+                self.wake = WakeWord(threshold=cfg.wake_threshold)
+            except Exception as e:  # noqa: BLE001 — internet yo'q / model buzuq: STT orqali uyg'otish qoladi
+                status(f"[!] Wake word modeli ishlamadi ({type(e).__name__}: {e}). "
+                       + ("'Jarvis' so'zi STT orqali tanib olinadi." if cfg.stt_wake else "Ctrl+Alt+J ishlating."))
         self.runtime: Runtime | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
         self.mic: Mic | None = None

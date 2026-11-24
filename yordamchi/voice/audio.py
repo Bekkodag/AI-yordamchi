@@ -298,6 +298,26 @@ class Endpointer:
 
 # --------------------------------------------------------------------------- wake word
 
+def ensure_wake_models(model: str = "hey_jarvis") -> None:
+    """openwakeword pip paketi modellarni o'zi bilan olib kelmaydi: yangi o'rnatishda birinchi ishga
+    tushganda (bir marta, ~10 MB) rasmiy relizdan yuklab olinadi."""
+    from pathlib import Path
+
+    import openwakeword
+    from openwakeword import utils
+
+    models_dir = Path(openwakeword.__file__).parent / "resources" / "models"
+    need = ["melspectrogram.onnx", "embedding_model.onnx", f"{model}_v0.1.onnx"]
+    if all((models_dir / n).exists() for n in need):
+        return
+    print(f"Wake word modeli yuklanmoqda ({model}), bir martalik...", flush=True)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    utils.download_models(model_names=[model], target_directory=str(models_dir))
+    missing = [n for n in need if not (models_dir / n).exists()]
+    if missing:
+        raise RuntimeError(f"wake word modellari yuklanmadi: {', '.join(missing)}")
+
+
 class WakeWord:
     """openWakeWord 'hey_jarvis' (80 ms kadrlar). 'Jarvis' deyish ham ko'pincha yetarli."""
 
@@ -306,6 +326,7 @@ class WakeWord:
     def __init__(self, model: str = "hey_jarvis", threshold: float = 0.5) -> None:
         from openwakeword.model import Model
 
+        ensure_wake_models(model)
         self.name = model
         self.threshold = threshold
         self.model = Model(wakeword_models=[model], inference_framework="onnx")

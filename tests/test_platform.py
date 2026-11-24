@@ -240,3 +240,39 @@ def test_api_skill_edit_rejects_bad_steps_and_path_traversal(client):
 
 def test_api_chat_without_runtime_is_503(client):
     assert client.post("/api/chat", json={"text": "salom"}).status_code == 503
+
+
+def test_free_port_skips_busy_port():
+    import socket
+
+    from yordamchi.api.server import free_port
+
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        got = free_port("127.0.0.1", port, tries=5)
+        assert got is not None and got != port
+
+
+def test_wake_models_present_or_downloaded(monkeypatch, tmp_path):
+    """Yangi o'rnatishda modellar yo'q: download_models chaqiriladi (testda internetga chiqmaymiz)."""
+    import openwakeword
+    from openwakeword import utils
+
+    from yordamchi.voice import audio
+
+    pkg = tmp_path / "openwakeword"
+    (pkg / "resources" / "models").mkdir(parents=True)
+    monkeypatch.setattr(openwakeword, "__file__", str(pkg / "__init__.py"))
+    calls = []
+
+    def fake_download(model_names, target_directory):
+        calls.append(model_names)
+        for n in ("melspectrogram.onnx", "embedding_model.onnx", "hey_jarvis_v0.1.onnx"):
+            (tmp_path / "openwakeword" / "resources" / "models" / n).write_bytes(b"x")
+
+    monkeypatch.setattr(utils, "download_models", fake_download)
+    audio.ensure_wake_models("hey_jarvis")
+    audio.ensure_wake_models("hey_jarvis")  # ikkinchi marta yuklamaydi
+    assert calls == [["hey_jarvis"]]

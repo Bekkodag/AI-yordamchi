@@ -630,6 +630,23 @@ def create_app() -> FastAPI:
 
 # --------------------------------------------------------------------------- server
 
+def free_port(host: str, start: int, tries: int = 20) -> int | None:
+    """Bo'sh portni topadi. Windows'da SO_EXCLUSIVEADDRUSE: band portni "bo'sh" deb o'ylamaslik uchun."""
+    import socket
+
+    for port in range(start, start + tries):
+        family = socket.AF_INET6 if ":" in host else socket.AF_INET
+        with socket.socket(family, socket.SOCK_STREAM) as s:
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            try:
+                s.bind((host, port))
+            except OSError:
+                continue
+            return port
+    return None
+
+
 def start_server(runtime=None, assistant=None, host: str | None = None, port: int | None = None) -> str:
     """Fon oqimida uvicorn. Panel manzilini (birinchi kirish tokeni bilan) qaytaradi."""
     import uvicorn
@@ -638,16 +655,23 @@ def start_server(runtime=None, assistant=None, host: str | None = None, port: in
     if STATE["server"] is not None:
         return STATE["url"]
     host = host or STORE.get("api.host") or "127.0.0.1"
-    port = int(port or STORE.get("api.port") or 8765)
+    wanted = int(port or STORE.get("api.port") or 8765)
+    port = free_port(host, wanted)  # boshqa nusxa (yoki dastur) portni band qilgan bo'lsa — keyingisi
+    if port is None:
+        raise RuntimeError(f"{wanted}-{wanted + 19} portlarning hammasi band")
     config = uvicorn.Config(create_app(), host=host, port=port, log_level="warning", access_log=False,
                             lifespan="off")
     server = uvicorn.Server(config)
     server.install_signal_handlers = lambda: None  # asosiy oqim Ctrl+C'ni o'zi boshqaradi
     threading.Thread(target=server.run, daemon=True, name="panel-api").start()
-    for _ in range(50):
+    for _ in range(100):
         if server.started:
             break
         time.sleep(0.1)
+    if not server.started:
+        server.should_exit = True
+        raise RuntimeError(f"panel {host}:{port} da ishga tushmadi")
+    STATE["port_note"] = f"{wanted}-port band, {port} ishlatildi" if port != wanted else None
     shown = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     STATE["server"] = server
     STATE["url"] = f"http://{shown}:{port}/?token={api_token()}"
