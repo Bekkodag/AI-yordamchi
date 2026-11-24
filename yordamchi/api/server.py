@@ -28,7 +28,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Request, WebSocket, W
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import __version__
+from .. import __author__, __url__, __version__
 from ..config import ROOT
 from ..settings import DATA_DIR, STORE
 
@@ -177,6 +177,7 @@ def create_app() -> FastAPI:
         rt, va = STATE["runtime"], STATE["assistant"]
         return {
             "version": __version__, "uptime_s": round(time.time() - STATE["started"]),
+            "author": __author__, "project_url": __url__,
             "running": rt is not None, "voice": va is not None,
             "voice_state": getattr(getattr(va, "state", None), "value", None),
             "missing_settings": STORE.missing_required(),

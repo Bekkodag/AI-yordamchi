@@ -76,9 +76,14 @@ Sozlamalarni `.env` fayli bilan ham berish mumkin — namuna: [.env.example](.en
 - [Xavfsizlik](SECURITY.md)
 - [Hissa qo'shish](CONTRIBUTING.md)
 
+## Muallif
+
+**Bek-dag Farhod Eliboyev** — g'oya va loyiha muallifi ([github.com/Bekkodag](https://github.com/Bekkodag)).
+
 ## Litsenziya
 
-[Apache-2.0](LICENSE)
+[Apache-2.0](LICENSE). Loyihadan foydalanish, o'zgartirish va tarqatish erkin; nusxalarda muallif
+haqidagi [NOTICE](NOTICE) fayli saqlanishi shart.
 
 ---
 
@@ -88,4 +93,4 @@ Sozlamalarni `.env` fayli bilan ham berish mumkin — namuna: [.env.example](.en
 speaks Uzbek, and learns from use. It works with any OpenAI-compatible LLM, has a web control panel
 (settings and secrets, tools, learned recipes, taught skills, facts, plugins, live logs), lets users teach
 new skills by demonstration, create their own tools (HTTP APIs, scripts, parametrised skills) without code, and is extensible through isolated plugins. Windows is fully supported;
-macOS/Linux control layers and mobile remote clients are planned. Licensed under Apache-2.0.
+macOS/Linux control layers and mobile remote clients are planned. Created by **Bek-dag Farhod Eliboyev**. Licensed under Apache-2.0.

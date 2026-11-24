@@ -49,13 +49,13 @@ function toggle(checked, onchange) {
   return h('label', { class: 'toggle' }, inp, h('span'));
 }
 
-function modal(title, body, actions) {
+function modal(title, body, actions, closeLabel = 'Bekor') {
   const bg = h('div', { class: 'modal-bg', onclick: (e) => { if (e.target === bg) bg.remove(); } });
   const close = () => bg.remove();
   bg.append(h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
     h('h2', {}, title), body,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('span', { class: 'spacer' }),
-      h('button', { class: 'btn ghost', onclick: close }, 'Bekor'), ...actions(close))));
+      h('button', { class: 'btn ghost', onclick: close }, closeLabel), ...actions(close))));
   document.body.append(bg);
   const first = bg.querySelector('input, textarea, select');
   if (first) first.focus();
@@ -72,6 +72,7 @@ async function refreshStatus() {
   try {
     STATUS = await api('/status');
     $('#brandName').textContent = 'AI-yordamchi' + (STATUS.assistant_name ? ` · ${STATUS.assistant_name}` : '');
+    $('#aboutVersion').textContent = STATUS.version ? 'v' + STATUS.version : '';
     const pill = $('#statusPill');
     if (!STATUS.running) { pill.className = 'pill warn'; pill.textContent = 'faqat panel'; }
     else if (STATUS.teaching) { pill.className = 'pill warn'; pill.textContent = "o'rgatilmoqda: " + STATUS.teaching; }
@@ -877,6 +878,22 @@ async function render() {
   try { await pages[page](); } catch (e) { show(h('div', { class: 'card error' }, 'Yuklab bo\'lmadi: ' + e.message)); }
   view.focus({ preventScroll: true });
 }
+
+function showAbout() {
+  const s = STATUS || {};
+  const author = s.author || 'Bek-dag Farhod Eliboyev';
+  const url = s.project_url || 'https://github.com/Bekkodag/AI-yordamchi';
+  modal('Loyiha haqida', h('div', { class: 'about' },
+    h('p', {}, "AI-yordamchi — kompyuterni o'zbek tilida ovoz bilan boshqaradigan, o'rganadigan va plugin'lar bilan " +
+      "kengayadigan ochiq kodli yordamchi."),
+    h('dl', {},
+      h('dt', {}, 'Muallif'), h('dd', {}, h('strong', {}, author)),
+      h('dt', {}, 'Versiya'), h('dd', {}, s.version || '—'),
+      h('dt', {}, 'Litsenziya'), h('dd', {}, 'Apache-2.0 (nusxalarda NOTICE fayli saqlanadi)'),
+      h('dt', {}, 'Manba kodi'), h('dd', {}, h('a', { href: url, target: '_blank', rel: 'noopener' }, url)),
+      h('dt', {}, 'Platforma'), h('dd', {}, s.platform || '—'))), () => [], 'Yopish');
+}
+$('#aboutBtn').addEventListener('click', showAbout);
 
 $('#menuBtn').addEventListener('click', () => $('#nav').classList.toggle('open'));
 $('#logoutBtn').addEventListener('click', async () => { await api('/logout', { method: 'POST' }).catch(() => {}); location.href = '/login'; });

@@ -3,8 +3,9 @@ name = "ai-yordamchi"
 version = "0.1.0"
 description = "O'zbekcha ovozli kompyuter yordamchisi: kompyuterni ovoz bilan boshqaradi, o'rganadi, plugin'lar bilan kengayadi"
 readme = "README.md"
+authors = [{ name = "Bek-dag Farhod Eliboyev" }]
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 keywords = ["assistant", "voice", "uzbek", "llm", "agent", "automation", "windows"]
 classifiers = [

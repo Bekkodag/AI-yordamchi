@@ -83,3 +83,24 @@ def test_assets_are_not_cached_stale(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "TOKEN_PATH", tmp_path / "api_token")
     r = TestClient(server.create_app()).get("/assets/app.js")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+
+
+def test_author_is_shown_everywhere(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from fastapi.testclient import TestClient
+
+    import yordamchi
+    from yordamchi.api import server
+
+    name = "Bek-dag Farhod Eliboyev"
+    root = Path(yordamchi.__file__).resolve().parent.parent
+    assert yordamchi.__author__ == name
+    assert name in (root / "NOTICE").read_text(encoding="utf-8")
+    assert name in (root / "README.md").read_text(encoding="utf-8")
+    monkeypatch.setattr(server, "TOKEN_PATH", tmp_path / "api_token")
+    c = TestClient(server.create_app())
+    assert name in c.get("/login").text
+    c.headers["Authorization"] = "Bearer " + server.api_token()
+    assert c.get("/api/status").json()["author"] == name
+    assert name in c.get("/").text
