@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-yordamchi — kirish</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="login-body">
+<main class="login-card">
+  <div class="brand"><span class="logo">◉</span> AI-yordamchi</div>
+  <p class="muted">Boshqaruv paneliga kirish uchun tokenni kiriting. U yordamchi ishga tushganda konsolda
+    chiqadi, shuningdek <code>data/api_token</code> faylida turadi.</p>
+  <form id="f">
+    <label for="t">Token</label>
+    <input id="t" type="password" autocomplete="current-password" required autofocus>
+    <button class="btn primary" type="submit">Kirish</button>
+    <p id="err" class="error" hidden></p>
+  </form>
+</main>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('err');
+  err.hidden = true;
+  const r = await fetch('/api/login', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({token: document.getElementById('t').value.trim()})});
+  if (r.ok) location.href = '/';
+  else { err.textContent = "Token noto'g'ri"; err.hidden = false; }
+});
+if (new URLSearchParams(location.search).get('bad')) {
+  const err = document.getElementById('err'); err.textContent = "Havoladagi token noto'g'ri"; err.hidden = false;
+}
+</script>
+</body>
+</html>

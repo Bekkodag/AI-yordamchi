@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>AI-yordamchi</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <button id="menuBtn" class="icon-btn" aria-label="Menyu">☰</button>
+  <div class="brand"><span class="logo">◉</span> <span id="brandName">AI-yordamchi</span></div>
+  <span id="statusPill" class="pill">…</span>
+</header>
+<div class="layout">
+  <nav id="nav" class="sidebar">
+    <a href="#/" data-page="home">Bosh sahifa</a>
+    <a href="#/chat" data-page="chat">Suhbat</a>
+    <div class="nav-group">Bilim</div>
+    <a href="#/skills" data-page="skills">O'rgatilgan skill'lar</a>
+    <a href="#/recipes" data-page="recipes">Retseptlar</a>
+    <a href="#/quirks" data-page="quirks">Ilova o'ziga xosliklari</a>
+    <a href="#/facts" data-page="facts">Faktlar va xotira</a>
+    <div class="nav-group">Tizim</div>
+    <a href="#/tools" data-page="tools">Vositalar</a>
+    <a href="#/plugins" data-page="plugins">Plugin'lar</a>
+    <a href="#/settings" data-page="settings">Sozlamalar va kalitlar</a>
+    <a href="#/logs" data-page="logs">Loglar</a>
+    <div class="nav-foot"><button id="logoutBtn" class="btn ghost small">Chiqish</button></div>
+  </nav>
+  <main id="view" class="content" tabindex="-1"></main>
+</div>
+<div id="confirmBox" class="confirm" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>
