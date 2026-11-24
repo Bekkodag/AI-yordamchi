@@ -43,12 +43,17 @@ Talablar: Windows 10/11, Python 3.11+, OpenAI-mos LLM (tool calling bilan). Ovoz
 serveri (masalan, o'zbek tilini qo'llaydigan o'z serveringiz).
 
 ```powershell
-git clone https://github.com/<siz>/AI-yordamchi.git
+git clone https://github.com/Bekkodag/AI-yordamchi.git
 cd AI-yordamchi
-python -m venv .venv
+py -3 -m venv .venv
 .venv\Scripts\pip install -e ".[all]"
 .venv\Scripts\python -m yordamchi --panel --open      # panelda sozlamalarni kiriting
 ```
+
+> **`py -3` haqida.** Windows'da `python` buyrug'i ko'pincha eski Python 2.7 ni ishga tushiradi.
+> `python3` esa Microsoft Store'ni ochadi. `py` ishga tushirgichi o'rnatilgan Python 3 ni o'zi topadi.
+> Bir nechta versiya bo'lsa, `py -0p` bilan ro'yxatini ko'ring va kerakligini tanlang, masalan `py -3.13`.
+> `.venv` yaratilgandan keyin doim `.venv\Scripts\python` ishlatiladi.
 
 Keyin:
 
