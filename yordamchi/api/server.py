@@ -202,7 +202,9 @@ def create_app() -> FastAPI:
     # ---------------------------------------------------------------- settings
     @app.get("/api/settings", dependencies=[Auth])
     def get_settings():
-        return {"settings": STORE.describe(), "secret_backend": STORE.secrets.backend}
+        from ..settings import PROVIDERS
+
+        return {"settings": STORE.describe(), "secret_backend": STORE.secrets.backend, "providers": PROVIDERS}
 
     @app.put("/api/settings", dependencies=[Auth])
     def put_settings(body: dict = Body(...)):

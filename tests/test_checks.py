@@ -128,3 +128,52 @@ def test_tts_body_has_voice_speed_normalize_seed(monkeypatch):
     assert asyncio.run(go())
     assert bodies[0] == {"text": "Salom", "language": "uz", "normalize": False, "playback_speed": 1.2,
                          "voice": "aziza-uz", "seed": 42}
+
+
+@pytest.mark.parametrize("raw,host,api", [
+    ("https://llm.lan", "https://llm.lan", "https://llm.lan/v1"),
+    ("https://llm.lan/v1/", "https://llm.lan", "https://llm.lan/v1"),
+    ("https://api.deepseek.com", "https://api.deepseek.com", "https://api.deepseek.com/v1"),
+    ("https://generativelanguage.googleapis.com/v1beta/openai",
+     "https://generativelanguage.googleapis.com/v1beta/openai", "https://generativelanguage.googleapis.com/v1beta/openai"),
+    ("https://api.groq.com/openai/v1", "https://api.groq.com/openai/v1", "https://api.groq.com/openai/v1"),
+    ("https://openrouter.ai/api/v1", "https://openrouter.ai/api/v1", "https://openrouter.ai/api/v1"),
+    ("", "", ""),
+])
+def test_split_base_url(raw, host, api):
+    assert config.split_base_url(raw) == (host, api)
+
+
+def test_presets_are_valid_and_cover_main_providers():
+    from yordamchi.settings import PROVIDERS
+
+    assert {"anthropic", "openai", "gemini", "deepseek", "mistral", "openrouter", "ollama", "custom"} <= set(PROVIDERS)
+    for pid, p in PROVIDERS.items():
+        assert p["label"] and (pid == "custom" or p["base_url"].startswith(("https://", "http://localhost")))
+        host, api = config.split_base_url(p["base_url"])
+        assert api == p["base_url"].rstrip("/") or pid == "custom"
+
+
+def test_public_provider_does_not_get_speech_or_key():
+    s = _settings(provider="deepseek", gateway_url="https://api.deepseek.com", api_base="https://api.deepseek.com/v1")
+    assert s.llm_base == "https://api.deepseek.com/v1" and s.speech_base == "" and s.speech_key == ""
+    own = _settings()
+    assert own.llm_base == "https://llm.example/v1" and own.speech_base == "https://llm.example"
+
+
+def test_anthropic_models_retry_with_native_key_header(monkeypatch):
+    seen = []
+
+    def handler(r: httpx.Request):
+        seen.append(dict(r.headers))
+        if r.url.path == "/v1/models":
+            if "x-api-key" not in r.headers:
+                return httpx.Response(401, json={"error": "auth"})
+            return httpx.Response(200, json={"data": [{"id": "claude-sonnet-5-5", "type": "model"}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    _mock(monkeypatch, handler, provider="anthropic", gateway_url="https://api.anthropic.com/v1",
+          api_base="https://api.anthropic.com/v1", model="claude-sonnet-5-5")
+    res = asyncio.run(checks.check_llm())
+    assert res["ok"] and res["options"]["llm.model"] == ["claude-sonnet-5-5"]
+    assert seen[1]["x-api-key"] == "tok-123456" and seen[1]["anthropic-version"]

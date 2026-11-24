@@ -46,13 +46,32 @@ def _tls_verify() -> bool | str:
     return bool(STORE.get("llm.verify_tls"))
 
 
+def split_base_url(raw: str) -> tuple[str, str]:
+    """"https://api.deepseek.com" -> (host, host/v1); "https://x/v1beta/openai" -> (x/v1beta/openai, o'zi).
+
+    Yo'lsiz manzilga /v1 qo'shiladi (o'z serveringiz, Ollama...). Yo'li bor manzil (Gemini, Groq, OpenRouter)
+    o'zgarmaydi — provayder qanday bergan bo'lsa shunday ishlatiladi.
+    """
+    from urllib.parse import urlsplit
+
+    raw = raw.strip().rstrip("/")
+    if not raw:
+        return "", ""
+    path = urlsplit(raw).path.strip("/")
+    if not path:
+        return raw, f"{raw}/v1"
+    if path == "v1":
+        return raw.removesuffix("/v1"), raw
+    return raw, raw
+
+
 class NotConfigured(SystemExit):
     """Majburiy sozlama yo'q — CLI xabar chiqaradi, panel esa sozlash sahifasini ochadi."""
 
 
 @dataclass(frozen=True)
 class Settings:
-    gateway_url: str                 # LLM API manzili (/v1 siz)
+    gateway_url: str                 # LLM server manzili (/v1 siz) — nutq serveri ham shunga tayanadi
     gateway_token: str
     tls_name: str | None
     verify: bool | str
@@ -70,14 +89,21 @@ class Settings:
     speech_seed: int = 0
     assistant_name: str = "Jarvis"
     learning: bool = True
+    api_base: str = ""               # to'liq OpenAI-mos API manzili (…/v1, …/v1beta/openai) — bo'sh = gateway_url/v1
+    provider: str = "custom"
+
+    @property
+    def llm_base(self) -> str:
+        return (self.api_base or f"{self.gateway_url}/v1").rstrip("/")
 
     @property
     def speech_base(self) -> str:
-        return (self.speech_url or self.gateway_url).rstrip("/")
+        # LLM serveringiz nutqni ham bersa (o'z gateway'ingiz) — o'sha; ommaviy provayderda alohida ko'rsatiladi
+        return (self.speech_url or (self.gateway_url if self.provider == "custom" else "")).rstrip("/")
 
     @property
     def speech_key(self) -> str:
-        return self.speech_token or self.gateway_token
+        return self.speech_token or (self.gateway_token if self.provider == "custom" else "")
 
     @classmethod
     def load(cls, require: bool = True) -> "Settings":
@@ -85,13 +111,16 @@ class Settings:
         from .settings import STORE
 
         g = STORE.get
-        url = (g("llm.base_url") or "").rstrip("/").removesuffix("/v1")
+        raw = (g("llm.base_url") or "").strip().rstrip("/")
+        url, api_base = split_base_url(raw)
         token = g("llm.api_key") or ""
         if require and (not url or not token or "XXXX" in token):
             raise NotConfigured("LLM sozlanmagan: llm.base_url va llm.api_key kerak "
                                 "(.env, yoki boshqaruv paneli: python -m yordamchi --panel)")
         return cls(
             gateway_url=url,
+            api_base=api_base,
+            provider=g("llm.provider") or "custom",
             gateway_token=token,
             tls_name=(g("llm.tls_server_name") or None) if url.startswith("https://") else None,
             verify=_tls_verify(),

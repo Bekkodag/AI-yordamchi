@@ -721,7 +721,41 @@ pages.settings = async () => {
     h('p', { class: 'muted' }, `Maxfiy kalitlar tizim saqlagichida turadi (${data.secret_backend}) va bu yerda hech qachon ` +
       "ko'rsatilmaydi. .env yoki muhit o'zgaruvchisi bilan berilgan qiymatlarni shu joyda o'zgartiring."),
     checkBox, form);
+  providerPicker(form, data.providers || {});
 };
+
+function providerPicker(form, providers) {
+  const sel = form.querySelector('[data-key="llm.provider"]');
+  if (!sel || sel.tagName !== 'SELECT') return;
+  for (const o of sel.options) if (providers[o.value]) o.textContent = providers[o.value].label;
+  const field = sel.closest('.field');
+  const info = h('div', { class: 'help' });
+  field.append(info);
+  const showInfo = () => {
+    const p = providers[sel.value] || {};
+    info.replaceChildren(...[p.note || null,
+      p.key_url ? h('span', {}, p.note ? ' · ' : '', 'Kalit olish: ', h('a', { href: p.key_url, target: '_blank', rel: 'noopener' }, p.key_url)) : null]
+      .filter(Boolean));
+  };
+  sel.addEventListener('change', () => {
+    const p = providers[sel.value] || {};
+    const url = form.querySelector('[data-key="llm.base_url"]');
+    const model = form.querySelector('[data-key="llm.model"]');
+    if (url && !url.disabled && p.base_url !== undefined) url.value = p.base_url;
+    if (model && !model.disabled) {
+      if (model.tagName === 'SELECT') {
+        const v = p.model || '';
+        if (![...model.options].some((o) => o.value === v)) model.prepend(h('option', { value: v }, v || '(tekshiruvdan keyin tanlang)'));
+        model.value = v;
+      } else model.value = p.model || '';
+    }
+    const key = form.querySelector('[data-key="llm.api_key"]');
+    if (key && !key.disabled) key.placeholder = 'yangi provayder kalitini kiriting';
+    showInfo();
+    toast("Kalitni kiriting va \"Ulanishni tekshirish\"ni bosing: modellar ro'yxati keladi", 6000);
+  });
+  showInfo();
+}
 
 function checkResults(c) {
   if (!c || !c.results || !c.results.length) return null;
@@ -779,6 +813,7 @@ function settingField(s, inputs) {
     get = () => (fromEnv ? undefined : input.value);
   }
   inputs[s.key] = get;
+  (input.querySelector ? (input.querySelector('input') || input) : input).dataset.key = s.key;
   const clear = s.type === 'secret' && s.is_set && !fromEnv ? h('button', { class: 'btn small danger', onclick: async () => {
     if (!confirm("Kalit o'chirilsinmi?")) return;
     try { await api('/settings', { method: 'PUT', body: { clear: [s.key] } }); render(); } catch (e) { fail(e); }

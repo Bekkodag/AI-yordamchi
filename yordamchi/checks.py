@@ -60,18 +60,30 @@ async def _get_json(http, url: str, headers: dict) -> Any:
     return r.json()
 
 
+async def _list_models(http, s, h: dict):
+    """/models — Anthropic o'z kalit sarlavhasini (x-api-key) ham talab qilishi mumkin: shuni ham sinaymiz."""
+    try:
+        return await _get_json(http, f"{s.llm_base}/models", h)
+    except Exception as e:  # noqa: BLE001
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        if status in (401, 403) and "anthropic.com" in s.llm_base:
+            return await _get_json(http, f"{s.llm_base}/models",
+                                   {"x-api-key": s.gateway_token, "anthropic-version": "2023-06-01"})
+        raise
+
+
 async def check_llm() -> dict:
     from .gateway import make_http
 
     s = _settings()
-    if not s.gateway_url:
+    if not s.llm_base or not s.gateway_url:
         return {"ok": False, "summary": "LLM manzili kiritilmagan"}
     if not s.gateway_token:
         return {"ok": False, "summary": "LLM API kaliti kiritilmagan"}
     http = make_http(s, timeout=20.0)
     h = {"Authorization": f"Bearer {s.gateway_token}"}
     try:
-        data = await _get_json(http, f"{s.gateway_url}/v1/models", h)
+        data = await _list_models(http, s, h)
         models = data.get("data", data) if isinstance(data, dict) else data
         models = [m for m in models if isinstance(m, dict) and m.get("id")]
         details = [{"name": m["id"],
@@ -88,7 +100,7 @@ async def check_llm() -> dict:
             return res
         # Tanlangan model haqiqatan javob beradimi (kalit + model + kvota)
         t0 = time.perf_counter()
-        r = await http.post(f"{s.gateway_url}/v1/chat/completions", headers=h, json={
+        r = await http.post(f"{s.llm_base}/chat/completions", headers=h, json={
             "model": s.model, "max_tokens": 5, "messages": [{"role": "user", "content": "ping"}]})
         r.raise_for_status()
         res["summary"] += f"; '{s.model}' javob berdi ({round((time.perf_counter() - t0) * 1000)} ms)"
@@ -101,8 +113,11 @@ async def check_speech() -> dict:
     from .gateway import make_http
 
     s = _settings()
-    if not s.speech_base:
-        return {"ok": None, "summary": "Nutq serveri sozlanmagan (ovozli rejim uchun kerak)"}
+    from .settings import STORE
+
+    if not s.speech_base or (s.provider != "custom" and not STORE.get("speech.base_url")):
+        # OpenAI/Claude/DeepSeek... o'zbekcha STT/TTS bermaydi — nutq serveri alohida ko'rsatilishi kerak
+        return {"ok": None, "summary": "Nutq serveri ko'rsatilmagan (ovozli rejim uchun kerak)"}
     http = make_http(s, timeout=20.0)
     try:
         data = await _get_json(http, f"{s.speech_base}/v1/tts/voices", {"Authorization": f"Bearer {s.speech_key}"})

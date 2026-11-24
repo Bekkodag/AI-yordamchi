@@ -237,12 +237,46 @@ STORE = SettingsStore()
 
 # --------------------------------------------------------------------------- core schema
 
+# Tayyor provayderlar: panelda tanlanganda manzil va model avtomatik to'ldiriladi. Hammasi OpenAI-mos
+# (chat/completions + tool calling) API orqali ishlaydi; ro'yxatda yo'q provayder — "custom".
+PROVIDERS: dict[str, dict] = {
+    "custom": {"label": "O'z serverim / boshqa OpenAI-mos API", "base_url": "", "model": "",
+               "key_url": "", "note": "Istalgan OpenAI-mos manzil: vLLM, LiteLLM, korporativ gateway..."},
+    "anthropic": {"label": "Anthropic Claude", "base_url": "https://api.anthropic.com/v1",
+                  "model": "claude-sonnet-5-5", "key_url": "https://console.anthropic.com/settings/keys",
+                  "note": "Claude'ning OpenAI-mos API'si orqali"},
+    "openai": {"label": "OpenAI", "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini",
+               "key_url": "https://platform.openai.com/api-keys", "note": ""},
+    "gemini": {"label": "Google Gemini", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+               "model": "gemini-2.5-flash", "key_url": "https://aistudio.google.com/apikey", "note": ""},
+    "deepseek": {"label": "DeepSeek", "base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat",
+                 "key_url": "https://platform.deepseek.com/api_keys", "note": ""},
+    "mistral": {"label": "Mistral", "base_url": "https://api.mistral.ai/v1", "model": "mistral-large-latest",
+                "key_url": "https://console.mistral.ai/api-keys", "note": ""},
+    "xai": {"label": "xAI Grok", "base_url": "https://api.x.ai/v1", "model": "",
+            "key_url": "https://console.x.ai", "note": "Modelni \"Ulanishni tekshirish\" ro'yxatidan tanlang"},
+    "groq": {"label": "Groq", "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b-versatile",
+             "key_url": "https://console.groq.com/keys", "note": ""},
+    "openrouter": {"label": "OpenRouter (yuzlab modellar bitta kalit bilan)", "base_url": "https://openrouter.ai/api/v1",
+                   "model": "", "key_url": "https://openrouter.ai/keys",
+                   "note": "Claude, GPT, Gemini, DeepSeek, Qwen, Llama... bitta kalit bilan"},
+    "together": {"label": "Together AI", "base_url": "https://api.together.xyz/v1", "model": "",
+                 "key_url": "https://api.together.ai/settings/api-keys", "note": ""},
+    "ollama": {"label": "Ollama (kompyuterda, bepul)", "base_url": "http://localhost:11434/v1", "model": "",
+               "key_url": "", "note": "Kalit kerak emas — istalgan so'zni yozing (masalan: ollama)"},
+    "lmstudio": {"label": "LM Studio (kompyuterda, bepul)", "base_url": "http://localhost:1234/v1", "model": "",
+                 "key_url": "", "note": "Kalit kerak emas — istalgan so'zni yozing"},
+}
+
+
 def _core() -> list[Setting]:
     S = Setting
     return [
         # LLM — istalgan OpenAI-mos provayder: o'z serveringiz, OpenAI, Gemini (OpenAI-mos), Ollama, vLLM...
+        S("llm.provider", "Provayder", "choice", default="custom", env=("LLM_PROVIDER",), section="LLM",
+          choices=tuple(PROVIDERS), help="Tanlansa manzil va model to'ldiriladi. Ro'yxatda yo'q bo'lsa — custom"),
         S("llm.base_url", "LLM manzili", default="", env=("LLM_BASE_URL", "LLM_GATEWAY_URL"), section="LLM",
-          help="OpenAI-mos API manzili, /v1 siz. Masalan https://api.openai.com yoki http://localhost:11434",
+          help="OpenAI-mos API manzili. Masalan https://api.deepseek.com/v1 yoki http://localhost:11434/v1",
           required=True),
         S("llm.api_key", "LLM API kaliti", "secret", env=("LLM_API_KEY", "LLM_GATEWAY_TOKEN"), section="LLM",
           required=True),

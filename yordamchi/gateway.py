@@ -40,7 +40,7 @@ def make_http(settings: Settings, timeout: float = 120.0) -> GatewayAsyncHttp:
 
 def make_llm(settings: Settings) -> AsyncOpenAI:
     return AsyncOpenAI(
-        base_url=f"{settings.gateway_url}/v1",
+        base_url=settings.llm_base,
         api_key=settings.gateway_token,
         http_client=make_http(settings),
         max_retries=2,

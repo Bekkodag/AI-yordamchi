@@ -25,7 +25,9 @@ Telegram'da kontaktni topadi va tasdiqlaganingizdan keyin yuboradi.
 - **O'z vositangiz** — paneldan kod yozmasdan: API chaqiruvi (kalitlar bilan), skript yoki parametrli
   o'rgatilgan skill ("Telegramda {kontakt}ga {xabar} yoz"). [Batafsil](docs/USER_TOOLS.md)
 - **Plugin'lar** — yangi funksiya asosiy kodga tegmasdan alohida modul bo'lib qo'shiladi.
-- **Istalgan LLM** — OpenAI-mos har qanday provayder: o'z serveringiz, OpenAI, Gemini, Ollama, vLLM...
+- **Istalgan LLM** — panelda provayderni tanlaysiz: Claude, OpenAI, Gemini, DeepSeek, Mistral, Grok, Groq,
+  OpenRouter, Together, kompyuterdagi Ollama / LM Studio yoki o'z serveringiz (istalgan OpenAI-mos API).
+  "Ulanishni tekshirish" kalit ishlashini va mavjud modellar ro'yxatini ko'rsatadi.
 - **Xavfsizlik** — xabar yuborish, fayl o'chirish, buyruq bajarish kabi amallar oldidan tasdiq so'raydi;
   kalitlar tizim saqlagichida (Windows Credential Manager) turadi; Ctrl+Alt+X — favqulodda to'xtatish.
 
