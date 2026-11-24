@@ -20,6 +20,7 @@ dependencies = [
     "rich>=13",
     "fastapi>=0.115",
     "uvicorn>=0.32",
+    "websockets>=13",          # panelning jonli loglari va suhbati (uvicorn WebSocket)
     "keyring>=25",
     "send2trash>=1.8",
     # Windows'da kompyuterni boshqarish qatlami

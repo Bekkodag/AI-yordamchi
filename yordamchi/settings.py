@@ -280,6 +280,9 @@ def _core() -> list[Setting]:
           section="Yordamchi"),
         S("agent.history_turns", "Eslab turiladigan suhbat navbatlari", "int", default=8,
           env=("AGENT_HISTORY_TURNS",), section="Yordamchi"),
+        S("agent.restore_minutes", "Qayta ishga tushganda suhbatni tiklash (daqiqa)", "int", default=30,
+          env=("AGENT_RESTORE_MINUTES",), section="Yordamchi",
+          help="Shu daqiqalar ichidagi savol-javoblar yordamchi xotirasiga qaytadi. 0 = tiklamaslik"),
         S("learning.enabled", "Vazifalardan avtomatik o'rganish", "bool", default=True,
           env=("LEARNING_ENABLED",), section="Yordamchi", restart=False),
         # Ovoz

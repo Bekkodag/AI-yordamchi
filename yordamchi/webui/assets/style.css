@@ -105,6 +105,7 @@ label { display: block; font-weight: 550; margin: 10px 0 4px; }
 .msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-text); }
 .msg.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
 .msg.sys { align-self: center; color: var(--muted); font-size: 0.85rem; }
+.msg-meta { margin-top: 4px; font-size: 0.72rem; opacity: .7; }
 .chat-input { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 12px 0; background: var(--bg); }
 
 /* logs */

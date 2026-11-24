@@ -155,7 +155,7 @@ class _FakeRuntime:
         self.turns = []
         self.agent = SimpleNamespace(llm=None)
 
-    async def turn(self, text):
+    async def turn(self, text, source="text"):
         self.turns.append(text)
         return AgentReply("ok", 1, 1.0)
 

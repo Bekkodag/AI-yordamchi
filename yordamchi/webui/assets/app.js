@@ -139,32 +139,81 @@ async function restart() {
 }
 
 // ---------------------------------------------------------------- chat
-const chatLog = [];
+let chatSocket = null;
+// Loglar mahalliy vaqtda yoziladi — panel ham mahalliy vaqtni ishlatsin (toISOString UTC beradi)
+function localIso(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+const SOURCE_LABEL = { voice: 'ovoz', panel: 'panel', text: 'konsol' };
+
+function logToChat(r) {
+  const map = { user: ['user', r.text], reply: ['bot', r.text], error: ['sys', 'xato: ' + (r.error || '')], cancelled: ['sys', "to'xtatildi"] };
+  const m = map[r.kind];
+  if (!m || !m[1]) return null;
+  return { ts: r.ts, who: m[0], text: String(m[1]), source: r.source || 'voice' };
+}
+
 pages.chat = async () => {
+  const data = await api('/chat/history?limit=300');
+  const items = data.items;
+  let busy = false;
   const box = h('div', { class: 'chat' });
-  const input = h('textarea', { rows: 2, placeholder: "Masalan: word dasturini och va yangi hujjat yarat" });
+  const input = h('textarea', { rows: 2, placeholder: 'Masalan: word dasturini och va yangi hujjat yarat' });
   const send = h('button', { class: 'btn primary' }, 'Yuborish');
   const stop = h('button', { class: 'btn', onclick: () => api('/chat/cancel', { method: 'POST' }).catch(fail) }, "To'xtat");
   const draw = () => {
-    box.replaceChildren(...(chatLog.length ? chatLog.map((m) => h('div', { class: 'msg ' + m.who }, m.text))
-      : [h('div', { class: 'empty' }, 'Yozma buyruq bering. Xavfli amallar uchun shu yerda tasdiq so\'raladi.')]));
+    const out = [];
+    let day = '';
+    for (const m of items) {
+      const d = (m.ts || '').slice(0, 10);
+      if (d && d !== day) { day = d; out.push(h('div', { class: 'msg sys' }, d)); }
+      out.push(h('div', { class: 'msg ' + m.who }, m.text,
+        m.who !== 'sys' ? h('div', { class: 'msg-meta' }, `${SOURCE_LABEL[m.source] || m.source} · ${(m.ts || '').slice(11, 16)}`) : null));
+    }
+    if (busy) out.push(h('div', { class: 'msg sys' }, 'bajarilmoqda…'));
+    box.replaceChildren(...(out.length ? out
+      : [h('div', { class: 'empty' }, "Yozma buyruq bering. Ovozda aytilganlar ham shu yerda ko'rinadi.")]));
     window.scrollTo(0, document.body.scrollHeight);
   };
+  // Jonli: ovozda yoki boshqa qurilmadagi paneldan aytilganlar ham darhol chiqadi
+  if (chatSocket) chatSocket.close();
+  let live = false;
+  try {
+    chatSocket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/logs/stream');
+    chatSocket.onopen = () => { live = true; };
+    chatSocket.onclose = () => { live = false; };
+    chatSocket.onmessage = (ev) => {
+      let r; try { r = JSON.parse(ev.data); } catch { return; }
+      const m = logToChat(r);
+      if (!m) return;
+      items.push(m);
+      if (m.who !== 'user' && busy && m.source === 'panel') busy = false;
+      draw();
+    };
+  } catch { chatSocket = null; }
   const go = async () => {
     const text = input.value.trim();
-    if (!text) return;
-    input.value = ''; chatLog.push({ who: 'user', text }); chatLog.push({ who: 'sys', text: 'bajarilmoqda…' }); draw();
+    if (!text || busy) return;
+    input.value = ''; busy = true; draw();
     send.disabled = true;
     try {
       const r = await api('/chat', { method: 'POST', body: { text } });
-      chatLog.pop();
-      chatLog.push(r.ok ? { who: 'bot', text: r.reply } : { who: 'sys', text: r.cancelled ? "to'xtatildi" : ('xato: ' + r.error) });
-    } catch (e) { chatLog.pop(); chatLog.push({ who: 'sys', text: 'xato: ' + e.message }); }
-    send.disabled = false; draw(); input.focus();
+      if (!live) {  // jonli oqim bo'lmasa — natijani o'zimiz qo'shamiz
+        const now = localIso();
+        items.push({ ts: now, who: 'user', text, source: 'panel' });
+        items.push(r.ok ? { ts: now, who: 'bot', text: r.reply, source: 'panel' }
+          : { ts: now, who: 'sys', text: r.cancelled ? "to'xtatildi" : ('xato: ' + r.error), source: 'panel' });
+      }
+    } catch (e) { items.push({ ts: localIso(), who: 'sys', text: 'xato: ' + e.message, source: 'panel' }); }
+    busy = false; send.disabled = false; draw(); input.focus();
   };
   send.addEventListener('click', go);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(); } });
-  show(h('h1', {}, 'Suhbat'), box, h('div', { class: 'chat-input' }, input, send, stop));
+  show(h('h1', {}, 'Suhbat'),
+    h('p', { class: 'muted' }, "Panel, ovoz va konsoldagi barcha suhbat (oxirgi 7 kun). Hammasi bitta umumiy suhbat: " +
+      "yordamchi ovozda aytilganni ham, shu yerda yozilganni ham eslab turadi."),
+    box, h('div', { class: 'chat-input' }, input, send, stop));
   draw(); input.focus();
 };
 
@@ -789,6 +838,7 @@ async function render() {
   $('#nav').classList.remove('open');
   document.querySelectorAll('.modal-bg').forEach((m) => m.remove()); // boshqa sahifaga o'tganda ochiq oyna qolmasin
   if (page !== 'logs' && logSocket) { logSocket.close(); logSocket = null; }
+  if (page !== 'chat' && chatSocket) { chatSocket.close(); chatSocket = null; }
   try { await pages[page](); } catch (e) { show(h('div', { class: 'card error' }, 'Yuklab bo\'lmadi: ' + e.message)); }
   view.focus({ preventScroll: true });
 }

@@ -158,6 +158,14 @@ def create_app() -> FastAPI:
         r.delete_cookie(COOKIE)
         return r
 
+    @app.middleware("http")
+    async def no_stale_assets(request: Request, call_next):
+        # Yangilanishdan keyin brauzer eski app.js/style.css'ni keshdan olmasin (ETag bilan tez tekshiradi)
+        resp = await call_next(request)
+        if request.url.path.startswith("/assets/"):
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
     app.mount("/assets", StaticFiles(directory=WEBUI_DIR / "assets"), name="assets")
 
     # ---------------------------------------------------------------- status
@@ -541,7 +549,7 @@ def create_app() -> FastAPI:
             old = agent.confirm
             agent.confirm = CONFIRM
             try:
-                return await rt.turn(text)
+                return await rt.turn(text, source="panel")
             finally:
                 agent.confirm = old
 
@@ -554,6 +562,14 @@ def create_app() -> FastAPI:
         if isinstance(res, Reply):
             return {"ok": True, "reply": res.text, "steps": res.steps, "ms": round(res.ms)}
         return {"ok": False, "error": getattr(res, "error", "xato")}
+
+    @app.get("/api/chat/history", dependencies=[Auth])
+    def chat_history(limit: int = 200):
+        """Panel, ovoz va konsol suhbatlari — loglardan (yordamchi qayta ishga tushsa ham saqlanadi)."""
+        from ..runtime import read_conversation
+
+        items = read_conversation(_log_dir(), days=7, limit=max(1, min(limit, 2000)))
+        return {"items": [{k: v for k, v in r.items() if k != "ts_epoch"} for r in items]}
 
     @app.post("/api/chat/cancel", dependencies=[Auth])
     def chat_cancel():

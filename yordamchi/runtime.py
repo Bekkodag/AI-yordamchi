@@ -61,6 +61,36 @@ class TurnLog:
                 pass
 
 
+def read_conversation(log_dir, days: int = 2, limit: int = 500) -> list[dict]:
+    """Loglardan suhbat: [{ts, ts_epoch, who: user|bot|sys, text, source}], eskidan yangiga."""
+    from datetime import timedelta
+
+    out: list[dict] = []
+    today = datetime.now().date()
+    for back in range(days - 1, -1, -1):
+        path = log_dir / f"{(today - timedelta(days=back)).isoformat()}.jsonl"
+        if not path.exists():
+            continue
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                if '"kind": "user"' not in line and '"kind": "reply"' not in line                         and '"kind": "error"' not in line and '"kind": "cancelled"' not in line:
+                    continue
+                try:
+                    r = json.loads(line)
+                    ts = datetime.fromisoformat(r["ts"])
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
+                kind = r.get("kind")
+                who, text = {"user": ("user", r.get("text")), "reply": ("bot", r.get("text")),
+                             "error": ("sys", f"xato: {r.get('error', '')}"),
+                             "cancelled": ("sys", "to'xtatildi")}.get(kind, (None, None))
+                if not who or not text:
+                    continue
+                out.append({"ts": r["ts"], "ts_epoch": ts.timestamp(), "who": who, "text": str(text),
+                            "source": r.get("source") or "voice"})
+    return out[-limit:]
+
+
 class Runtime:
     def __init__(self, settings: Settings, confirm: Callable[[str], Awaitable[bool]],
                  on_event: Callable[[Event], None], kill_hotkey: bool = True) -> None:
@@ -82,6 +112,7 @@ class Runtime:
             model=settings.model, max_steps=settings.max_steps, history_turns=settings.history_turns,
             on_tool_hang=self._replace_executor, assistant_name=settings.assistant_name,
         )
+        self.restore_history()  # qayta ishga tushganda yaqindagi suhbat davom etadi
         self.procedures = Procedures()
         self.agent.procedures = self.procedures
         self.learn_enabled = settings.learning
@@ -96,9 +127,38 @@ class Runtime:
             self.hotkey.start()
             self.hotkey.registered.wait(2)
 
+    # ------------------------------------------------------------------ history
+    def restore_history(self, minutes: float | None = None) -> int:
+        """Oxirgi `minutes` daqiqadagi savol-javoblarni logdan agent tarixiga qaytaradi.
+
+        Faqat matn (vosita natijalari emas) — "uni telegramdan yubor" kabi davomli gaplar uchun yetarli."""
+        from .settings import STORE
+
+        minutes = float(STORE.get("agent.restore_minutes", 30) if minutes is None else minutes)
+        if minutes <= 0:
+            return 0
+        cutoff = datetime.now().timestamp() - minutes * 60
+        pairs = [r for r in read_conversation(self.dir_for_logs(), days=2) if r["ts_epoch"] >= cutoff]
+        hist: list[dict] = []
+        for r in pairs:
+            if r["who"] == "user":
+                hist.append({"role": "user", "content": r["text"]})
+            elif r["who"] == "bot" and hist and hist[-1]["role"] == "user":
+                hist.append({"role": "assistant", "content": r["text"]})
+        while hist and hist[-1]["role"] == "user":  # javobsiz qolgan savol (to'xtatilgan) — tashlaymiz
+            hist.pop()
+        self.agent.history[:0] = hist
+        self.agent._trimmed()
+        if hist:
+            self.log.write("history_restored", turns=sum(1 for m in hist if m["role"] == "user"), minutes=minutes)
+        return len(hist)
+
+    def dir_for_logs(self):
+        return self.log.dir
+
     # ------------------------------------------------------------------ API
-    def submit(self, text: str) -> Future:
-        return asyncio.run_coroutine_threadsafe(self.turn(text), self.loop)
+    def submit(self, text: str, source: str = "text") -> Future:
+        return asyncio.run_coroutine_threadsafe(self.turn(text, source=source), self.loop)
 
     def cancel(self) -> None:
         """Istalgan oqimdan chaqirsa bo'ladi (kill switch, Ctrl+C, ovozli 'to'xta')."""
@@ -132,11 +192,14 @@ class Runtime:
         self.executor.shutdown(wait=False, cancel_futures=True)
 
     # ------------------------------------------------------------------ turn
-    async def turn(self, text: str) -> Reply | Failed | None:
-        """Bitta foydalanuvchi navbati. Runtime loop'ida alohida task sifatida ishga tushiring."""
+    async def turn(self, text: str, source: str = "text") -> Reply | Failed | None:
+        """Bitta foydalanuvchi navbati. Runtime loop'ida alohida task sifatida ishga tushiring.
+
+        source: "voice" (mikrofon), "panel" (Web UI), "text" (konsol) — logda va panel suhbatida ko'rinadi.
+        Barcha manbalar bitta umumiy suhbat tarixini ishlatadi."""
         self._task = asyncio.current_task()
-        self.log.write("user", text=text)
-        self._bus.emit("user_text", text=text)
+        self.log.write("user", text=text, source=source)
+        self._bus.emit("user_text", text=text, source=source)
         self._undo_learning_if_negative(text)
         convo = [f"{m['role']}: {m['content'][:200]}" for m in self.agent.history
                  if m["role"] in ("user", "assistant") and m.get("content")][-4:]
@@ -151,11 +214,11 @@ class Runtime:
                     self._bus.emit("tool_finished", name=ev.name, args=ev.args, result=ev.result)
                 elif isinstance(ev, (Reply, Failed)):
                     final = ev
-                    self.log.write("reply" if isinstance(ev, Reply) else "error", **asdict(ev))
+                    self.log.write("reply" if isinstance(ev, Reply) else "error", source=source, **asdict(ev))
                     self._bus.emit("reply" if isinstance(ev, Reply) else "error", user_text=text, **asdict(ev))
                 self.on_event(ev)
         except asyncio.CancelledError:
-            self.log.write("cancelled", ms=round((time.perf_counter() - t0) * 1000))
+            self.log.write("cancelled", source=source, ms=round((time.perf_counter() - t0) * 1000))
             return None
         finally:
             self._task = None

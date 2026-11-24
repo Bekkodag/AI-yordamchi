@@ -745,7 +745,7 @@ class VoiceAssistant:
                     break
                 self._set(State.THINKING)
                 t0 = time.perf_counter()
-                turn = asyncio.create_task(self.runtime.turn(text))
+                turn = asyncio.create_task(self.runtime.turn(text, source="voice"))
                 try:
                     res = await asyncio.wait_for(asyncio.shield(turn), self.cfg.turn_timeout_s)
                 except TimeoutError:
