@@ -29,6 +29,23 @@ def _verify(v: str | None) -> bool | str:
     return v.strip()  # CA bundle fayli
 
 
+def _tls_verify() -> bool | str:
+    """CA fayli > eski uslub (verify qiymatida fayl yo'li) > tugma (true/false)."""
+    from .settings import STORE
+
+    ca = (STORE.get("llm.ca_file") or "").strip()
+    if ca:
+        return ca
+    for name in ("LLM_VERIFY_TLS", "LLM_GATEWAY_VERIFY"):
+        raw = os.environ.get(name)
+        if raw and raw.strip():
+            return _verify(raw)
+    raw = STORE._config().get("llm.verify_tls")
+    if isinstance(raw, str) and raw.strip():
+        return _verify(raw)
+    return bool(STORE.get("llm.verify_tls"))
+
+
 class NotConfigured(SystemExit):
     """Majburiy sozlama yo'q — CLI xabar chiqaradi, panel esa sozlash sahifasini ochadi."""
 
@@ -49,6 +66,8 @@ class Settings:
     stt_path: str = "/v1/stt/transcribe"
     tts_path: str = "/v1/tts/stream"
     speech_language: str = "uz"
+    speech_normalize: bool = True
+    speech_seed: int = 0
     assistant_name: str = "Jarvis"
     learning: bool = True
 
@@ -75,7 +94,7 @@ class Settings:
             gateway_url=url,
             gateway_token=token,
             tls_name=(g("llm.tls_server_name") or None) if url.startswith("https://") else None,
-            verify=_verify(g("llm.verify_tls")),
+            verify=_tls_verify(),
             model=g("llm.model") or "fast",
             gemini_api_key=os.environ.get("GEMINI_API_KEY") or None,
             max_steps=int(g("agent.max_steps")),
@@ -85,6 +104,8 @@ class Settings:
             stt_path=g("speech.stt_path") or "/v1/stt/transcribe",
             tts_path=g("speech.tts_path") or "/v1/tts/stream",
             speech_language=g("speech.language") or "uz",
+            speech_normalize=bool(g("speech.normalize")),
+            speech_seed=int(g("speech.seed") or 0),
             assistant_name=g("assistant.name") or "Jarvis",
             learning=bool(g("learning.enabled")),
         )

@@ -46,6 +46,8 @@ class GatewaySpeech:
         self.stt_path, self.tts_path = settings.stt_path, settings.tts_path
         self.http = make_http(settings, timeout=20.0)
         self.voice, self.language, self.speed = voice, language or settings.speech_language, speed
+        self.normalize = getattr(settings, "speech_normalize", True)
+        self.seed = int(getattr(settings, "speech_seed", 0) or 0)
 
     async def transcribe(self, pcm16k: bytes) -> dict:
         r = await self.http.post(f"{self.base}{self.stt_path}", headers=self.h, timeout=20.0,
@@ -68,9 +70,11 @@ class GatewaySpeech:
                     yield c
 
     async def _tts_once(self, text: str) -> AsyncIterator[bytes]:
-        body = {"text": text, "language": self.language, "normalize": True, "playback_speed": self.speed}
+        body = {"text": text, "language": self.language, "normalize": self.normalize, "playback_speed": self.speed}
         if self.voice:
             body["voice"] = self.voice
+        if self.seed:
+            body["seed"] = self.seed
         async with self.http.stream("POST", f"{self.base}{self.tts_path}", headers=self.h, json=body) as r:
             if r.status_code >= 400:
                 await r.aread()

@@ -29,7 +29,8 @@ h2 { font-size: 1.1rem; margin: 22px 0 8px; }
 .topbar .pill { margin-left: auto; }
 .layout { display: flex; min-height: calc(100vh - 52px); }
 .sidebar { width: 232px; flex: none; padding: 12px 8px; background: var(--panel); border-right: 1px solid var(--line);
-  display: flex; flex-direction: column; gap: 2px; }
+  display: flex; flex-direction: column; gap: 2px;
+  position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto; }  /* sahifa bilan surilmaydi */
 .sidebar a { padding: 8px 12px; border-radius: 8px; color: var(--text); text-decoration: none; }
 .sidebar a:hover { background: var(--panel-2); }
 .sidebar a.active { background: var(--accent); color: var(--accent-text); }
@@ -40,7 +41,7 @@ h2 { font-size: 1.1rem; margin: 22px 0 8px; }
 .icon-btn { display: none; background: none; border: 0; color: var(--text); font-size: 1.3rem; cursor: pointer; }
 @media (max-width: 760px) {
   .icon-btn { display: block; }
-  .sidebar { position: fixed; top: 52px; bottom: 0; left: 0; z-index: 4; transform: translateX(-100%);
+  .sidebar { position: fixed; top: 52px; bottom: 0; left: 0; z-index: 4; transform: translateX(-100%); height: auto;
     transition: transform .2s; box-shadow: 0 0 30px rgba(0,0,0,.25); }
   .sidebar.open { transform: none; }
   .content { padding: 16px; }

@@ -617,35 +617,84 @@ pages.plugins = async () => {
 };
 
 // ---------------------------------------------------------------- settings
+let CHECK = { options: {}, results: [], ts: null };
+
 pages.settings = async () => {
-  const data = await api('/settings');
+  const [data, last] = await Promise.all([api('/settings'), api('/settings/options').catch(() => null)]);
+  if (last && last.ts) CHECK = last;
   const groups = {};
   for (const s of data.settings) (groups[s.section || s.group] ||= []).push(s);
   const inputs = {};
+  const dirty = { v: false };
   const form = h('div', {});
+  form.addEventListener('input', () => { dirty.v = true; });
+  form.addEventListener('change', () => { dirty.v = true; });
   for (const [section, items] of Object.entries(groups)) {
     const card = h('div', { class: 'card' }, h('h2', { style: 'margin-top:0' }, section));
     for (const s of items) card.append(settingField(s, inputs));
     form.append(card);
   }
   const save = h('button', { class: 'btn primary' }, 'Saqlash');
-  save.addEventListener('click', async () => {
+  const saveValues = async () => {
     const values = {};
     for (const [key, get] of Object.entries(inputs)) { const v = get(); if (v !== undefined) values[key] = v; }
+    const r = await api('/settings', { method: 'PUT', body: { values } });
+    dirty.v = false;
+    return r;
+  };
+  save.addEventListener('click', async () => {
     try {
-      const r = await api('/settings', { method: 'PUT', body: { values } });
+      const r = await saveValues();
       if (Object.keys(r.errors).length) toast('Xatolar: ' + Object.entries(r.errors).map(([k, v]) => `${k}: ${v}`).join('; '), 8000);
       else toast(r.restart_needed ? 'Saqlandi. Kuchga kirishi uchun qayta ishga tushiring.' : 'Saqlandi', 4000);
       render();
     } catch (e) { fail(e); }
   });
+  const checkBtn = h('button', { class: 'btn' }, 'Ulanishni tekshirish');
+  const checkBox = h('div', {});
+  checkBox.append(checkResults(CHECK));
+  checkBtn.addEventListener('click', async () => {
+    checkBtn.disabled = true; checkBtn.textContent = 'Tekshirilmoqda…';
+    try {
+      if (dirty.v) {  // kiritilgan, lekin saqlanmagan kalitlar bilan tekshiramiz
+        const r = await saveValues();
+        if (Object.keys(r.errors).length) toast('Saqlanmadi: ' + Object.values(r.errors).join('; '), 8000);
+      }
+      CHECK = await api('/settings/check', { method: 'POST' });
+      await render();
+      const box = document.getElementById('checkCard');
+      if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { fail(e); checkBtn.disabled = false; checkBtn.textContent = 'Ulanishni tekshirish'; }
+  });
   show(
-    h('div', { class: 'row' }, h('h1', {}, 'Sozlamalar va kalitlar'), h('span', { class: 'spacer' }), save,
-      h('button', { class: 'btn', onclick: restart }, 'Qayta ishga tushirish')),
+    h('div', { class: 'row', style: 'flex-wrap:wrap' }, h('h1', {}, 'Sozlamalar va kalitlar'), h('span', { class: 'spacer' }),
+      checkBtn, save, h('button', { class: 'btn', onclick: restart }, 'Qayta ishga tushirish')),
     h('p', { class: 'muted' }, `Maxfiy kalitlar tizim saqlagichida turadi (${data.secret_backend}) va bu yerda hech qachon ` +
       "ko'rsatilmaydi. .env yoki muhit o'zgaruvchisi bilan berilgan qiymatlarni shu joyda o'zgartiring."),
-    form);
+    checkBox, form);
 };
+
+function checkResults(c) {
+  if (!c || !c.results || !c.results.length) return null;
+  const when = c.ts ? new Date(c.ts * 1000).toLocaleTimeString() : '';
+  return h('div', { class: 'card', id: 'checkCard' },
+    h('div', { class: 'row' }, h('h2', { style: 'margin:0' }, 'Ulanish natijasi'), h('span', { class: 'spacer' }),
+      h('span', { class: 'muted' }, when)),
+    c.results.map((r) => {
+      const cls = r.ok === true ? 'ok' : r.ok === false ? 'bad' : '';
+      const word = r.ok === true ? 'ishlayapti' : r.ok === false ? 'xato' : "o'tkazildi";
+      const list = (r.details || []).length ? h('details', {},
+        h('summary', {}, `Ro'yxat (${r.details.length})`),
+        h('table', { class: 'table' }, h('tbody', {}, r.details.map((d) => h('tr', {},
+          h('td', { class: 'mono' }, d.name), h('td', { class: 'muted' }, d.info || '')))))) : null;
+      return h('div', { class: 'list-item' }, h('div', { class: 'main' },
+        h('strong', {}, r.label), ' ', h('span', { class: 'pill ' + cls }, word), ' ',
+        h('span', { class: 'muted' }, `${r.ms} ms`),
+        h('div', {}, r.summary || r.error || ''), list));
+    }),
+    Object.keys(c.options || {}).length ? h('div', { class: 'help' },
+      "Topilgan modellar va ovozlar quyidagi maydonlarda tanlash ro'yxati bo'lib chiqdi.") : null);
+}
 
 function settingField(s, inputs) {
   const fromEnv = s.source === 'env';
@@ -658,6 +707,13 @@ function settingField(s, inputs) {
     input = h('label', { class: 'toggle' }, input, h('span'));
     const inner = input.querySelector('input');
     get = () => (fromEnv ? undefined : inner.checked);
+  } else if ((CHECK.options || {})[s.key] && CHECK.options[s.key].length && !fromEnv) {
+    const opts = [...CHECK.options[s.key]];
+    const cur = s.value ?? '';
+    if (!opts.includes(cur)) opts.unshift(cur);
+    input = h('select', {}, opts.map((o) => h('option', { value: o, selected: o === cur || null },
+      o === '' ? '(standart)' : (o === cur && !CHECK.options[s.key].includes(cur) ? `${o} (ro'yxatda yo'q)` : o))));
+    get = () => input.value;
   } else if (s.type === 'choice') {
     input = h('select', { disabled: fromEnv || null }, s.choices.map((c) => h('option', { value: c, selected: c === s.value || null }, c)));
     get = () => (fromEnv ? undefined : input.value);

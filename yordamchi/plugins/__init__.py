@@ -120,6 +120,7 @@ class PluginContext:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.log = logging.getLogger(f"yordamchi.plugin.{info.id}")
         self._router = None
+        self._checks: list[tuple[str | None, Callable]] = []
         self._timers: list[threading.Event] = []
         self.runtime = None  # Runtime (agent, log) — ishga tushgach beriladi; panel-only rejimda None
 
@@ -169,6 +170,15 @@ class PluginContext:
                     return
 
         threading.Thread(target=loop, daemon=True, name=f"plugin-{self.id}-job").start()
+
+    def check(self, fn: Callable[[], dict], label: str | None = None) -> Callable:
+        """Panelning "Ulanishni tekshirish" tugmasi uchun: kalit ishlaydimi, servis nima taklif qiladi.
+
+        fn() -> {"ok": bool | None, "summary": str, "details": [{"name", "info"}],
+                 "options": {"<sozlama kaliti>": [qiymatlar]}}   # sozlamada tanlash ro'yxati bo'ladi
+        """
+        self._checks.append((label, fn))
+        return fn
 
     def router(self):
         """Plugin'ning o'z HTTP yo'llari: /api/plugins/<id>/... (panel token bilan himoyalangan)."""

@@ -52,7 +52,41 @@ def ask_gemini(api_key: str, model: str, question: str, png: bytes, timeout: flo
     return "".join(p.get("text", "") for p in parts).strip() or "(bo'sh javob)"
 
 
+def list_models(api_key: str, timeout: float = 20.0) -> list[dict]:
+    """Kalit bilan mavjud Gemini modellari (faqat matn/rasm generatsiya qiladiganlari)."""
+    out, token = [], None
+    for _ in range(10):
+        params = {"pageSize": 1000, **({"pageToken": token} if token else {})}
+        r = httpx.get("https://generativelanguage.googleapis.com/v1beta/models", params=params, timeout=timeout,
+                      headers={"x-goog-api-key": api_key})
+        r.raise_for_status()
+        data = r.json()
+        out += [m for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
+        token = data.get("nextPageToken")
+        if not token:
+            break
+    return out
+
+
 def setup(ctx) -> None:
+    @ctx.check
+    def gemini_check() -> dict:
+        key = ctx.setting("api_key")
+        if not key:
+            return {"ok": None, "summary": "Gemini kaliti kiritilmagan (ixtiyoriy)"}
+        models = list_models(key)
+        names = [m["name"].removeprefix("models/") for m in models]
+        chosen = ctx.setting("model") or "gemini-2.5-flash"
+        details = [{"name": m["name"].removeprefix("models/"),
+                    "info": ", ".join(x for x in (m.get("displayName"),
+                                                  f"{m['inputTokenLimit']:,} token".replace(",", " ")
+                                                  if m.get("inputTokenLimit") else None) if x)} for m in models]
+        res = {"ok": True, "summary": f"{len(names)} ta model mavjud", "details": details, "options": {"model": names}}
+        if chosen not in names:
+            res["ok"] = False
+            res["summary"] += f"; tanlangan '{chosen}' yo'q"
+        return res
+
     @ctx.tool(timeout=90)
     def look_at_screen(question: Annotated[str, "What to find out from the screen, in the user's language"]) -> dict:
         """Take a screenshot and ask a vision model about it: read text, explain an error, find where a

@@ -232,6 +232,18 @@ def create_app() -> FastAPI:
                  "params": list((t.parameters.get("properties") or {}).keys())}
                 for t in sorted(reg.all(), key=lambda x: (x.source, x.name))]
 
+    @app.post("/api/settings/check", dependencies=[Auth])
+    async def settings_check():
+        from .. import checks
+
+        return await checks.run_all()
+
+    @app.get("/api/settings/options", dependencies=[Auth])
+    def settings_options():
+        from .. import checks
+
+        return {"options": checks.LAST["options"], "results": checks.LAST["results"], "ts": checks.LAST["ts"]}
+
     @app.get("/api/tools", dependencies=[Auth])
     def tools():
         return {"tools": _tool_rows()}
