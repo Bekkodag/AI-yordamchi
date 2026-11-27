@@ -1,6 +1,6 @@
 """Ovozli assistent holat mashinasi.
 
-IDLE --(wake word / "Jarvis, ..." / Ctrl+Alt+J)--> LISTENING --(VAD: gap tugadi)--> THINKING
+IDLE --(wake word / "<sozlanadigan nom>, ..." / Ctrl+Alt+J)--> LISTENING --(VAD: gap tugadi)--> THINKING
      (STT -> agent) --> SPEAKING (TTS stream) --> LISTENING (follow-up, wake word'siz) --> ... --> IDLE
 
 Ishonchlilik qoidalari (hech narsa cheksiz kutmaydi):
@@ -54,14 +54,15 @@ _MAX_STATE_S = {State.LISTENING: 25, State.THINKING: 200, State.SPEAKING: 120}
 @dataclass
 class VoiceConfig:
     wake: bool = True
+    wake_word: str = "Asalim"
     wake_threshold: float = 0.4
     wake_threshold_speaking: float = 0.85   # o'z ovozidan uyg'onib ketmasligi uchun
-    stt_wake: bool = True                    # kutishda qisqa gaplarni STT qilib "Jarvis..." ni tanish
+    stt_wake: bool = True                    # kutishda qisqa gaplarni STT qilib "Asalim..." ni tanish
     follow_up: bool = True                   # javobdan keyin wake word'siz yana tinglash
     follow_up_timeout_ms: int = 10000
     first_timeout_ms: int = 7000
     turn_timeout_s: float = 180.0
-    continue_window_s: float = 30.0          # suhbat tugagach "Jarvis"siz buyruq qabul qilinadigan vaqt
+    continue_window_s: float = 30.0          # suhbat tugagach "Asalim"siz buyruq qabul qilinadigan vaqt
     continue_after_media_s: float = 180.0    # qo'shiq/video qo'yilgach: "qo'shiqni o'chir" odatda 1-3 daqiqada
     duck: bool = True                        # suhbat paytida boshqa ilovalar ovozini pasaytirish
     duck_level: float = 0.3                  # 0.3 = asl ovozning 30% i
@@ -78,9 +79,29 @@ class VoiceConfig:
 
 
 _APOS = re.compile(r"[ʻʼ’‘`']")
-_WAKE_PREFIX = re.compile(
-    r"^\s*(?:(?:hey|hi|ey|xey|hay|эй|хей|ой)[\s,]+)?"
-    r"(?:(?:d?j|dzh|ch)a?r?[vw][iy]?[sz]|д?жа?р?ви?[сз])\w*[\s,.!?-]*", re.IGNORECASE)
+_WAKE_PREFIX = re.compile(r"(?!)")
+_WAKE_TARGETS: tuple[str, ...] = ("asalim",)
+
+
+def configure_wake_word(wake_word: str) -> str:
+    global _WAKE_PREFIX, _WAKE_TARGETS
+    wake_word = " ".join((wake_word or "Asalim").strip().split())
+    norm_word = _norm(wake_word)
+    if not norm_word:
+        wake_word = "Asalim"
+        norm_word = "asalim"
+    target = _translit(norm_word).replace("'", "")
+    variants = {target}
+    if len(target) >= 4:
+        variants.update((target[:-1], target + "m"))
+    _WAKE_TARGETS = tuple(sorted(variants, key=len, reverse=True))
+    escaped = "|".join(re.escape(v) for v in _WAKE_TARGETS)
+    _WAKE_PREFIX = re.compile(
+        r"^\s*(?:(?:hey|hi|ey|xey|hay|эй|хей|ой)[\s,]+)?"
+        rf"(?:{escaped})\w*[\s,.!?-]*",
+        re.IGNORECASE,
+    )
+    return wake_word
 _STOP = {"toxta", "toxtat", "toxtating", "bas", "stop", "bekor qil", "bekor", "jim", "jim bol", "yetadi",
          "yetarli", "стоп", "хватит", "отмена"}
 _YES = ("ha", "xa", "haa", "albatta", "mayli", "tasdiqlayman", "roziman", "ok", "okey", "bajar", "da", "да",
@@ -122,27 +143,34 @@ def fix_mixed_script(text: str) -> str:
     return " ".join(_translit(w) if _HAS_LAT.search(w) and _HAS_CYR.search(w) else w for w in text.split())
 
 
-# Bolalar "Jarvis"ni "Darvis" deydi; STT esa "darbis", "darveys", "narvis", "radvis" deb yozadi (24.11 logi)
-_WAKE_TARGETS = ("jarvis", "darvis", "jariz")
+# STT wake wordni turli talaffuzlarda yozishi mumkin.
 # O'xshash, lekin oddiy so'zlar (qo'shiq so'zlari ham): bular hech qachon wake emas
-_NOT_WAKE = {"darvesh", "darvish", "dervish", "darveshi", "darveshlar", "darvoza", "javob", "jarayon", "arvoh",
-             "davlat", "davom", "darvozani", "zarvaraq", "darsni", "darslar", "parvoz", "javobi", "dars", "davri"}
+_NOT_WAKE = {
+    "salim", "taslim", "nasim", "qasim", "narsim", "qalim", "salom", "javob", "jarayon", "arvoh",
+    "davlat", "davom", "darsni", "darslar", "parvoz", "javobi", "dars", "davri",
+}
 
 
-def _jarvis_like(token: str) -> bool:
+def _asalim_like(token: str) -> bool:
     w = _translit(_norm(token)).replace("'", "")
-    if not 4 <= len(w) <= 8 or w in _NOT_WAKE:
+    if not 2 <= len(w) or w in _NOT_WAKE:
         return False
+    if w in _WAKE_TARGETS:
+        return True
     return max(difflib.SequenceMatcher(None, w, t).ratio() for t in _WAKE_TARGETS) >= 0.72
 
 
+# Eski importlar bilan orqaga moslik.
+_jarvis_like = _asalim_like
+
+
 def find_wake_anywhere(text: str) -> tuple[bool, str]:
-    """Gapning istalgan joyidagi "Jarvis" ("qo'shiqni o'chir, darvis"). Wake so'zlari olib tashlangan matnni
+    """Gapning istalgan joyidagi "Asalim" ("qo'shiqni o'chir, asalim"). Wake so'zlari olib tashlangan matnni
     qaytaradi. Faqat qisqa gaplar uchun — uzun suhbat ichida tasodifiy o'xshash so'z chiqib qolmasin."""
     toks = (text or "").split()
     if not toks or len(toks) > 14:
         return False, text
-    keep = [t for t in toks if not _jarvis_like(t.strip(",.!?"))]
+    keep = [t for t in toks if not _asalim_like(t.strip(",.!?"))]
     if len(keep) == len(toks):
         return False, text
     return True, " ".join(keep).strip(" ,.!?")
@@ -156,7 +184,7 @@ def _wake_split(text: str) -> tuple[bool, str]:
         return True, text[m.end():].strip()
     toks = text.split()
     i = 1 if toks and _norm(toks[0]) in _GREET else 0
-    if i < len(toks) and _jarvis_like(toks[i]):
+    if i < len(toks) and _asalim_like(toks[i]):
         return True, " ".join(toks[i + 1:]).strip(" ,.!?")
     return False, text
 
@@ -187,7 +215,7 @@ def strip_wake(text: str) -> str:
     if not found:
         rest = text.strip()
     toks = rest.split()
-    if toks and _jarvis_like(toks[-1].strip(",.!?")):  # "bosilmadi jarvis"
+    if toks and _asalim_like(toks[-1].strip(",.!?")):  # "bosilmadi asalim"
         rest = " ".join(toks[:-1])
     return rest.strip(" ,")
 
@@ -225,11 +253,12 @@ class VoiceAssistant:
     def __init__(self, settings: Settings, cfg: VoiceConfig, status: Callable[[str], None] = print) -> None:
         self.settings = settings
         self.cfg = cfg
+        cfg.wake_word = configure_wake_word(cfg.wake_word)
         self.status = status
         self.speech = GatewaySpeech(settings, voice=cfg.voice, speed=cfg.speed)
         self.player = Player(rate=TTS_RATE, device=cfg.output_device)
         self.endpointer = Endpointer(EndpointConfig())
-        # Kutish rejimida "Jarvis, ..." ni STT orqali tanish uchun alohida endpointer
+        # Kutish rejimida "Asalim, ..." ni STT orqali tanish uchun alohida endpointer
         self.idle_ep = Endpointer(EndpointConfig(silence_ms=600, max_ms=8000, start_timeout_ms=10**9))
         self.wake = None
         if cfg.wake:
@@ -237,7 +266,7 @@ class VoiceAssistant:
                 self.wake = WakeWord(threshold=cfg.wake_threshold)
             except Exception as e:  # noqa: BLE001 — internet yo'q / model buzuq: STT orqali uyg'otish qoladi
                 status(f"[!] Wake word modeli ishlamadi ({type(e).__name__}: {e}). "
-                       + ("'Jarvis' so'zi STT orqali tanib olinadi." if cfg.stt_wake else "Ctrl+Alt+J ishlating."))
+                       + (f"'{cfg.wake_word}' so'zi STT orqali tanib olinadi." if cfg.stt_wake else "Ctrl+Alt+J ishlating."))
         self.runtime: Runtime | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
         self.mic: Mic | None = None
@@ -372,7 +401,7 @@ class VoiceAssistant:
                 self.ev("aec_unavailable", error=f"{type(e).__name__}: {e}")
                 self.status(f"Echo cancellation yoqilmadi: {e}")
         self.mic.start()
-        hint = "'Jarvis' yoki 'Hey Jarvis' deng" if self.wake or self.cfg.stt_wake else "Ctrl+Alt+J bosing"
+        hint = f"'{self.cfg.wake_word}' deng" if self.wake or self.cfg.stt_wake else "Ctrl+Alt+J bosing"
         self.status(f"Tayyor. {hint}; to'xtatish: Ctrl+Alt+X yoki \"to'xta\".")
         self.ev("start", wake=bool(self.wake), stt_wake=self.cfg.stt_wake, threshold=self.cfg.wake_threshold)
         recovered = await self._com_call(self.ducker.recover_from_crash)
@@ -494,7 +523,7 @@ class VoiceAssistant:
                     self._idle_stt = self._spawn(self._check_idle_utterance(audio, ref))
 
     async def _check_idle_utterance(self, audio: bytes, ref: bytes = b"") -> None:
-        """Kutishda eshitilgan qisqa gap 'Jarvis ...' bilan boshlansa — uni buyruq sifatida qabul qiladi."""
+        """Kutishda eshitilgan qisqa gap 'Asalim ...' bilan boshlansa — uni buyruq sifatida qabul qiladi."""
         loud_ref = bool(ref) and rms16(ref) > 150
         ref_res = None
         try:
@@ -521,7 +550,7 @@ class VoiceAssistant:
         if has_wake(text):
             rest = strip_wake(text)
             self.ev("stt_wake", text=text[:120])
-            self.status(f"'Jarvis' eshitildi: {text!r}")
+            self.status(f"'{self.cfg.wake_word}' eshitildi: {text!r}")
             self._session = asyncio.create_task(self._run_session(first_text=rest or None))
             return
         # "qo'shiqni o'chir, darvis" — wake gap o'rtasida/oxirida. Qolgan qism haqiqiy buyruq bo'lsagina qabul
@@ -536,10 +565,10 @@ class VoiceAssistant:
                 self.ev("wake_anywhere", text=text[:120], cls=kind)
                 if kind in ("command", "answer") and self.state == State.IDLE and not (
                         self._session and not self._session.done()):
-                    self.status(f"'Jarvis' eshitildi: {text!r}")
+                    self.status(f"'{self.cfg.wake_word}' eshitildi: {text!r}")
                     self._session = asyncio.create_task(self._run_session(first_text=rest))
                     return
-        # Davom oynasi: suhbat yaqinda tugagan bo'lsa, "Jarvis"siz aytilgan aniq buyruqni ham qabul qilamiz
+        # Davom oynasi: suhbat yaqinda tugagan bo'lsa, "Asalim"siz aytilgan aniq buyruqni ham qabul qilamiz
         # (logda: sessiya tugagach 11 s o'tib "youtube dasturini och" deyilgan va e'tiborsiz qolgan)
         if text and time.monotonic() < self._continue_until and not looks_like_noise(text):
             kind = await classify(self.runtime.agent.llm, self.settings.model, text, self._last_reply)
@@ -555,7 +584,7 @@ class VoiceAssistant:
         if self.state == State.LISTENING:
             return
         if self._confirming:
-            # Logda: tasdiq savoli paytida "Jarvis, yes" deyilgan -> barge-in buyruqni bekor qilgan, "yes" esa
+            # Logda: tasdiq savoli paytida "Asalim, yes" deyilgan -> barge-in buyruqni bekor qilgan, "yes" esa
             # yangi buyruq bo'lib ketgan. Endi faqat savolni to'xtatamiz, javobni confirm() o'zi tinglaydi.
             self.ev("wake_in_confirm", source=source, score=round(score, 3) if score is not None else None)
             self.player.stop()
@@ -714,7 +743,7 @@ class VoiceAssistant:
                     self._beep(EARCON_DONE)
                     self._set(State.THINKING)
                     text = await self.transcribe(audio)
-                    if not text or (not follow and looks_like_noise(text)):  # bo'sh / faqat "Jarvis" / shovqin
+                    if not text or (not follow and looks_like_noise(text)):  # bo'sh / faqat "Asalim" / shovqin
                         empty += 1
                         if empty >= 3:
                             end_reason = "empty_stt"
@@ -786,7 +815,7 @@ class VoiceAssistant:
         finally:
             self.ev("session_end", reason=end_reason)
             if self._session is me:  # barge-in bo'lsa yangi sessiya ducking'ni davom ettiradi
-                # Tabiiy tugagan suhbatdan keyin 30 s davomida "Jarvis"siz aniq buyruq ham qabul qilinadi
+                # Tabiiy tugagan suhbatdan keyin 30 s davomida "Asalim"siz aniq buyruq ham qabul qilinadi
                 # agent_end ham: qo'shiq qo'yilgach "qo'shiqni o'chir" deyiladi (24.11: bola 7 marta takrorlagan).
                 # Davom oynasida faqat classify=command qabul qilinadi, qo'shiq so'zlari o'tmaydi.
                 natural = end_reason in ("no_speech", "ignored_3", "empty_stt", "no_follow_up", "media_started")
@@ -796,5 +825,5 @@ class VoiceAssistant:
                 self._set(State.IDLE)
                 if end_reason not in ("cancelled",):
                     self._beep(EARCON_SLEEP)
-                    hint = "'Jarvis' deng" if (self.wake or self.cfg.stt_wake) else "Ctrl+Alt+J bosing"
+                    hint = f"'{self.cfg.wake_word}' deng" if (self.wake or self.cfg.stt_wake) else "Ctrl+Alt+J bosing"
                     self.status(f"Kutish rejimi - davom etish uchun {hint}.")

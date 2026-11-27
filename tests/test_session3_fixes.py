@@ -269,16 +269,16 @@ def test_messenger_message_field_send_needs_confirmation(monkeypatch):
     w._ELEMENTS_WIN.clear()
 
 
-# --------------------------------------------------------------------------- 24.11: bolaning "Darvis"i
+# --------------------------------------------------------------------------- Wake word: Asalim
 
-@pytest.mark.parametrize("t", ["darvis", "darbis", "darveys", "narvis", "jariiz", "jarviiz", "darves", "Jarvis"])
-def test_kid_wake_variants(t):
+@pytest.mark.parametrize("t", ["asalim", "assalim", "aslim", "osalim", "asoliim", "Asalim"])
+def test_asalim_wake_variants(t):
     from yordamchi.voice.assistant import _jarvis_like
 
     assert _jarvis_like(t)
 
 
-@pytest.mark.parametrize("t", ["darvesh", "dervish", "javob", "davlat", "davom", "parvoz", "qo'shiqni"])
+@pytest.mark.parametrize("t", ["salim", "taslim", "javob", "davlat", "davom", "parvoz", "qo'shiqni"])
 def test_not_wake_words(t):
     from yordamchi.voice.assistant import _jarvis_like
 
@@ -288,10 +288,10 @@ def test_not_wake_words(t):
 def test_wake_in_the_middle_or_end():
     from yordamchi.voice.assistant import find_wake_anywhere
 
-    assert find_wake_anywhere("bo'ldi qo'shiqni o'chir darvis qo'shiqni o'chir bo'ldi") == (
+    assert find_wake_anywhere("bo'ldi qo'shiqni o'chir asalim qo'shiqni o'chir bo'ldi") == (
         True, "bo'ldi qo'shiqni o'chir qo'shiqni o'chir bo'ldi")
-    assert find_wake_anywhere("yangi yil haqidagi qo'shiqni darves") == (True, "yangi yil haqidagi qo'shiqni")
-    assert find_wake_anywhere("darvesh mast aylading")[0] is False  # qo'shiq so'zi
+    assert find_wake_anywhere("yangi yil haqidagi qo'shiqni aslim") == (True, "yangi yil haqidagi qo'shiqni")
+    assert find_wake_anywhere("salim mast aylading")[0] is False
     assert find_wake_anywhere("bugun bozorga bordik")[0] is False
 
 

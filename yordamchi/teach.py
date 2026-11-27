@@ -1,9 +1,9 @@
 """O'rgatish rejimi: foydalanuvchi qadamlarni o'zi ko'rsatadi, JARVIS yozib oladi va keyin takrorlaydi.
 
-    "Jarvis, o'rgatish: burp suite'ni ishga tushirish"  -> start_teaching
+    "Asalim, o'rgatish: burp suite'ni ishga tushirish"  -> start_teaching
     ... foydalanuvchi dasturni ochadi, "Next", "Start Burp" ni bosadi ...
-    "Jarvis, o'rgatish tugadi"                          -> stop_teaching  -> data/skills/<nom>.json
-    "Jarvis, burp suite'ni och"                         -> run_skill
+    "Asalim, o'rgatish tugadi"                          -> stop_teaching  -> data/skills/<nom>.json
+    "Asalim, burp suite'ni och"                         -> run_skill
 
 Yozish: past darajali sichqoncha/klaviatura hook'lari (WH_MOUSE_LL / WH_KEYBOARD_LL). Har bosishda:
 UI Automation elementi (nomi, turi, AutomationId) + oynaning nisbiy koordinatasi (Java/Swing kabi UIA
