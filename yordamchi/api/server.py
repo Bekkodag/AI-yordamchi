@@ -184,7 +184,9 @@ def create_app() -> FastAPI:
             "secret_backend": STORE.secrets.backend,
             "teaching": RECORDER.name if RECORDER.active else None,
             "plugins": {p.id: p.status for p in plugins.PLUGINS.values()},
-            "assistant_name": STORE.get("assistant.name"), "platform": sys.platform,
+            "assistant_name": STORE.get("assistant.name"),
+            "wake_word": STORE.get("voice.wake_word") or STORE.get("assistant.name") or "Asalim",
+            "platform": sys.platform,
             "pending_confirmations": [{"id": c["id"], "text": c["text"]} for c in CONFIRM.pending.values()],
         }
 

@@ -152,7 +152,7 @@ class Agent:
     llm_timeout: float = 90.0
     # Tool timeout bo'lsa oqim band qolishi mumkin; yangi executor beradigan callback
     on_tool_hang: Callable[[], Executor] | None = None
-    assistant_name: str = "Jarvis"
+    assistant_name: str = "Asalim"
     history: list[dict] = field(default_factory=list)
     procedures: object | None = None  # learning.Procedures: o'xshash vazifalarning ishlagan qadamlari
     _procs: list = field(default_factory=list, repr=False)

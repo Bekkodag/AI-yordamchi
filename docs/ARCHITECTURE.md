@@ -24,7 +24,7 @@
 ## Asosiy oqim
 
 1. **Ovoz** (`voice/assistant.py`): mikrofon kadrlari echo cancellation'dan o'tadi, VAD gap boshi va
-   oxirini topadi, "Jarvis" so'zi (wake word modeli yoki STT) sessiyani boshlaydi. Sessiya ichidagi
+   oxirini topadi, "Asalim" so'zi (STT wake word) sessiyani boshlaydi. Sessiya ichidagi
    keyingi gaplar filtrdan o'tadi (`voice/gate.py`): musiqa, televizor va boshqalarga aytilgan gaplar
    e'tiborsiz qoladi.
 2. **Navbat** (`runtime.py`): matn agentga beriladi, har voqea `logs/YYYY-MM-DD.jsonl`ga yoziladi va

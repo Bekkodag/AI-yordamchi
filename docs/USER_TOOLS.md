@@ -53,7 +53,7 @@ Get-ChildItem $env:P_PAPKA | Measure-Object | Select-Object -ExpandProperty Coun
    `{kontakt}` hamda `{xabar}` ga almashtiring.
 3. **Vositaga aylantirish** tugmasini bosing. Parametrlar avtomatik to'ldiriladi.
 
-Shundan keyin "Jarvis, Telegramda Sardorga ertaga uchrashuv bor deb yoz" desangiz, yordamchi o'rgatilgan
+Shundan keyin "Asalim, Telegramda Sardorga ertaga uchrashuv bor deb yoz" desangiz, yordamchi o'rgatilgan
 qadamlarni `kontakt=Sardor`, `xabar=...` qiymatlari bilan takrorlaydi. Parametrli skill'ni vositaga
 aylantirmasdan ham ishlatsa bo'ladi: yordamchi `run_skill(..., params=...)` ni o'zi chaqiradi.
 
