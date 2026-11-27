@@ -87,7 +87,8 @@ class Settings:
     speech_language: str = "uz"
     speech_normalize: bool = True
     speech_seed: int = 0
-    assistant_name: str = "Jarvis"
+    assistant_name: str = "Asalim"
+    wake_word: str = "Asalim"
     learning: bool = True
     api_base: str = ""               # to'liq OpenAI-mos API manzili (…/v1, …/v1beta/openai) — bo'sh = gateway_url/v1
     provider: str = "custom"
@@ -135,7 +136,8 @@ class Settings:
             speech_language=g("speech.language") or "uz",
             speech_normalize=bool(g("speech.normalize")),
             speech_seed=int(g("speech.seed") or 0),
-            assistant_name=g("assistant.name") or "Jarvis",
+            assistant_name=g("assistant.name") or "Asalim",
+            wake_word=g("voice.wake_word") or g("assistant.name") or "Asalim",
             learning=bool(g("learning.enabled")),
         )
 

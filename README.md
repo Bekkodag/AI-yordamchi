@@ -4,13 +4,13 @@
 
 > *English summary below.*
 
-"Jarvis, Word'ni och, yangi hujjat tayyorla" desangiz, yordamchi Word'ni ochadi, aktivatsiya oynasini o'zi
+"Asalim, Word'ni och, yangi hujjat tayyorla" desangiz, yordamchi Word'ni ochadi, aktivatsiya oynasini o'zi
 yopadi va yangi hujjat yaratadi. "Chromedagi bu linkni Telegramdan Aliga yubor" desangiz, havolani oladi,
 Telegram'da kontaktni topadi va tasdiqlaganingizdan keyin yuboradi.
 
 ## Imkoniyatlar
 
-- **Ovoz bilan boshqarish** — "Jarvis" so'zi bilan uyg'onadi (bolalar talaffuzi "Darvis"ni ham taniydi),
+- **Ovoz bilan boshqarish** — Wake word boshqaruv panelining "Ovoz" bo'limida istalgan nomga sozlanadi (masalan: Asalim, Malik, Komron),
   o'zbekcha tushunadi va javob beradi. Gapirayotganingizda boshqa ovozlarni pasaytiradi, kompyuterdan
   chiqayotgan musiqa so'zlarini buyruq deb olmaydi (echo cancellation).
 - **Kompyuterni boshqarish** — dasturlar, oynalar, tugmalar, klaviatura, fayllar, brauzer vkladkalari,
@@ -18,7 +18,7 @@ Telegram'da kontaktni topadi va tasdiqlaganingizdan keyin yuboradi.
 - **O'rganadi** — muvaffaqiyatli bajarilgan vazifadan "retsept" yozib oladi; ilovalarning injiqliklarini
   ("Word ochilganda aktivatsiya oynasi chiqadi") eslab qoladi; "yo'q, bo'lmadi" desangiz noto'g'ri
   o'rganganini o'chiradi.
-- **Ko'rsatib o'rgatish** — "Jarvis, o'rgatish rejimi..." deysiz, kerakli ishni bir marta o'zingiz qilasiz,
+- **Ko'rsatib o'rgatish** — "Asalim, o'rgatish rejimi..." deysiz, kerakli ishni bir marta o'zingiz qilasiz,
   keyin yordamchi uni aynan takrorlaydi. Parollar yozib olinmaydi.
 - **Boshqaruv paneli (Web UI)** — sozlamalar va maxfiy kalitlar, vositalar, retseptlar, skill'lar, faktlar,
   plugin'lar, jonli loglar va yozma suhbat. Telefondan ham ochiladi.

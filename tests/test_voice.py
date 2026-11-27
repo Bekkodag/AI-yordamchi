@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import numpy as np
 
-from yordamchi.voice.assistant import is_stop, parse_yes, strip_wake
+from yordamchi.voice.assistant import configure_wake_word, is_stop, parse_yes, strip_wake
 from yordamchi.voice.audio import FRAME_BYTES, EndpointConfig, Endpointer
 
 
 def test_strip_wake():
-    assert strip_wake("Jarvis, chromeni och") == "chromeni och"
-    assert strip_wake("hey jarvis ovozni oshir") == "ovozni oshir"
-    assert strip_wake("djarvis telegramni yop") == "telegramni yop"
-    assert strip_wake("джарвис открой хром") == "открой хром"
+    assert strip_wake("Asalim, chromeni och") == "chromeni och"
+    assert strip_wake("hey asalim ovozni oshir") == "ovozni oshir"
+    assert strip_wake("assalim telegramni yop") == "telegramni yop"
+    assert strip_wake("aslim chrome'ni och") == "chrome'ni och"
+
+
+def test_custom_wake_word():
+    assert configure_wake_word("Malik") == "Malik"
+    assert strip_wake("Malik, chromeni och") == "chromeni och"
+    assert strip_wake("Hey Malik ovozni oshir") == "ovozni oshir"
+    configure_wake_word("Asalim")
     assert strip_wake("chromeni och") == "chromeni och"
 
 

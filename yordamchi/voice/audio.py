@@ -298,7 +298,9 @@ class Endpointer:
 
 # --------------------------------------------------------------------------- wake word
 
-def ensure_wake_models(model: str = "hey_jarvis") -> None:
+def ensure_wake_models(model: str = "asalim") -> None:
+    if model == "asalim":
+        return
     """openwakeword pip paketi modellarni o'zi bilan olib kelmaydi: yangi o'rnatishda birinchi ishga
     tushganda (bir marta, ~10 MB) rasmiy relizdan yuklab olinadi."""
     from pathlib import Path
@@ -319,11 +321,19 @@ def ensure_wake_models(model: str = "hey_jarvis") -> None:
 
 
 class WakeWord:
-    """openWakeWord 'hey_jarvis' (80 ms kadrlar). 'Jarvis' deyish ham ko'pincha yetarli."""
+    """Asalim uchun openWakeWord modeli mavjud emas; STT wake so'zni tanlaydi."""
 
     CHUNK = 1280
 
-    def __init__(self, model: str = "hey_jarvis", threshold: float = 0.5) -> None:
+    def __init__(self, model: str = "asalim", threshold: float = 0.5) -> None:
+        if model == "asalim":
+            self.name = model
+            self.threshold = threshold
+            self.model = None
+            self._buf = bytearray()
+            self.cooldown = 0
+            self.peak = 0.0
+            return
         from openwakeword.model import Model
 
         ensure_wake_models(model)
@@ -339,11 +349,14 @@ class WakeWord:
         return p
 
     def reset(self) -> None:
-        self.model.reset()
+        if self.model is not None:
+            self.model.reset()
         self._buf.clear()
 
     def feed(self, frame: bytes) -> float | None:
         """Aniqlansa skor qaytaradi, aks holda None."""
+        if self.model is None:
+            return None
         self._buf.extend(frame)
         hit = None
         while len(self._buf) >= self.CHUNK * 2:

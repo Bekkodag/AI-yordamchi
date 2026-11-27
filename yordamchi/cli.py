@@ -2,7 +2,7 @@
 
     python -m yordamchi                 # interaktiv (matn)
     python -m yordamchi --once "chrome'ni och"
-    python -m yordamchi --voice         # ovozli rejim ("Jarvis" yoki Ctrl+Alt+J)
+    python -m yordamchi --voice         # ovozli rejim ("Asalim" yoki Ctrl+Alt+J)
     python -m yordamchi --say "Salom"   # TTS sinovi
 """
 
@@ -161,8 +161,10 @@ def main() -> None:
     v.add_argument("--no-wake", action="store_true", help="Wake word o'chiq, faqat Ctrl+Alt+J")
     v.add_argument("--no-follow-up", action="store_true", help="Javobdan keyin qayta tinglamasin")
     v.add_argument("--wake-threshold", type=float, default=float(g("voice.wake_threshold")))
+    v.add_argument("--wake-word", default=str(g("voice.wake_word") or g("assistant.name") or "Asalim"),
+                   help="Ovozni uyg'otuvchi istalgan nom yoki so'z")
     v.add_argument("--no-stt-wake", action="store_true",
-                   help="Kutishda qisqa gaplarni STT orqali 'Jarvis' uchun tekshirmasin")
+                   help="Kutishda sozlangan wake wordni STT orqali tekshirmasin")
     v.add_argument("--follow-up-ms", type=int, default=int(g("voice.follow_up_ms")))
     v.add_argument("--no-duck", action="store_true", help="Suhbat paytida boshqa ilovalar ovozini pasaytirmasin")
     v.add_argument("--duck-level", type=float, default=float(g("voice.duck_level")),
@@ -212,7 +214,8 @@ def main() -> None:
             return int(x) if x and str(x).isdigit() else (x or None)
 
         vcfg = VoiceConfig(
-            wake=not args.no_wake, wake_threshold=args.wake_threshold, follow_up=not args.no_follow_up,
+            wake=not args.no_wake, wake_word=args.wake_word, wake_threshold=args.wake_threshold,
+            follow_up=not args.no_follow_up,
             stt_wake=not args.no_stt_wake, follow_up_timeout_ms=args.follow_up_ms,
             duck=not args.no_duck and bool(g("voice.duck")), duck_level=args.duck_level,
             voice=args.voice_name, speed=args.speed, aec=not args.no_aec and bool(g("voice.aec")),

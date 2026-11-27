@@ -230,7 +230,7 @@ pages.skills = async () => {
           h('button', { class: 'btn primary', onclick: () => teachStop(true) }, 'Tugatish va saqlash'),
           h('button', { class: 'btn', onclick: () => teachStop(false) }, 'Bekor qilish')))
       : h('div', {}, h('p', { class: 'muted' }, 'Nom bering, "Boshlash"ni bosing va amallarni bajaring: dasturni oching, ' +
-          'tugmalarni bosing, matn yozing. Parol maydonlari yozilmaydi. Ovoz bilan ham bo\'ladi: "Jarvis, o\'rgatish rejimi…".'),
+          'tugmalarni bosing, matn yozing. Parol maydonlari yozilmaydi. Ovoz bilan ham bo\'ladi: "Asalim, o\'rgatish rejimi…".'),
         (() => {
           const name = h('input', { placeholder: "masalan: burp suite ishga tushirish" });
           return h('div', { class: 'row' }, name,

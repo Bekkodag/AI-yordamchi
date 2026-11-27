@@ -17,9 +17,10 @@ from yordamchi.voice.audio import PlaybackError, Player
 
 
 def test_uzbek_wake_variants():
-    for t in ("ey jarvis", "Ey Jarvis, chromeni och", "jarvis", "Djarvis", "charvis ovozni oshir", "Джарвис"):
+    for t in ("ey asalim", "Ey Asalim, chromeni och", "asalim", "assalim", "aslim ovozni oshir"):
         assert has_wake(t), t
-    assert strip_wake("ey jarvis") == ""
+    assert strip_wake("ey asalim") == ""
+    assert not has_wake("jarvis")
     assert not has_wake("chorshanba kuni") and not has_wake("ovozni oshir")
 
 

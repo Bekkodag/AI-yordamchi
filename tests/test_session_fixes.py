@@ -9,8 +9,8 @@ from yordamchi.tools import memory as mem
 from yordamchi.voice.assistant import fix_mixed_script, has_wake, spoken_part, strip_wake
 
 
-@pytest.mark.parametrize("heard", ["darvis", "jaris", "jalis", "jarmis", "jarbisz", "jarviz", "ey jarvis"])
-def test_misheard_jarvis_from_log_wakes(heard):
+@pytest.mark.parametrize("heard", ["asalim", "assalim", "aslim", "osalim", "ey asalim"])
+def test_misheard_asalim_wakes(heard):
     assert has_wake(heard)
 
 
@@ -20,8 +20,8 @@ def test_non_wake_words_do_not_wake(heard):
 
 
 def test_strip_trailing_and_leading_wake():
-    assert strip_wake("jarviz meni sardor deb nomla") == "meni sardor deb nomla"
-    assert strip_wake("bosilmadi jarbisz") == "bosilmadi"
+    assert strip_wake("aslim meni sardor deb nomla") == "meni sardor deb nomla"
+    assert strip_wake("bosilmadi assalim") == "bosilmadi"
 
 
 def test_mixed_script_from_log():
